@@ -7,6 +7,27 @@ const imageAccept = 'image/jpeg,image/png,image/webp';
 const audioAccept = 'audio/mpeg,audio/wav,audio/ogg,audio/flac,audio/mp4,.mp3,.wav,.ogg,.flac,.m4a';
 const randomPublicId = () => `#${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
 
+async function optimizeImageFile(file, kind) {
+  if (!file?.type?.startsWith('image/') || file.size < 350 * 1024) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxSide = kind === 'avatar' ? 512 : kind === 'chat' ? 1400 : 1600;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size < 1024 * 1024) return file;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', .82));
+    if (!blob || blob.size >= file.size) return file;
+    const name = file.name.replace(/\.[^.]+$/, '') || 'image';
+    return new File([blob], `${name}.webp`, { type: 'image/webp', lastModified: Date.now() });
+  } catch {
+    return file;
+  }
+}
+
 function durationOf(file) {
   return new Promise((resolve, reject) => {
     const audio = new Audio(), url = URL.createObjectURL(file);
@@ -18,14 +39,33 @@ function durationOf(file) {
   });
 }
 async function uploadFiles(form, storage, fields) {
+  const prepared = await Promise.all(fields.map(async ([field, kind]) => {
+    const original = form.get(field);
+    if (!(original instanceof File) || !original.size) return null;
+    const file = kind !== 'audio' ? await optimizeImageFile(original, kind) : original;
+    if (file !== original) form.set(field, file);
+    return { field, kind, file };
+  }));
   if (storage.storage !== 'blob') return form;
-  for (const [field, kind] of fields) {
-    const file = form.get(field); if (!(file instanceof File) || !file.size) continue;
+  const uploaded = await Promise.all(prepared.filter(Boolean).map(async ({ field, kind, file }) => {
     const ext = file.name.includes('.') ? `.${file.name.split('.').pop().replace(/[^a-z0-9]/gi, '').slice(0, 8)}` : '';
     const blob = await uploadToBlob(`melodik/${kind}/${crypto.randomUUID()}${ext}`, file, { access: 'public', contentType: file.type || undefined, handleUploadUrl: '/api/admin/upload-token', clientPayload: JSON.stringify({ kind }) });
-    form.delete(field); form.set(`${field}Url`, blob.url); form.set(`${field}Pathname`, blob.pathname);
+    return { field, url: blob.url, pathname: blob.pathname };
+  }));
+  for (const item of uploaded) {
+    form.delete(item.field); form.set(`${item.field}Url`, item.url); form.set(`${item.field}Pathname`, item.pathname);
   }
   return JSON.stringify(Object.fromEntries(form));
+}
+
+function setBodyField(body, key, value) {
+  if (typeof body !== 'string') {
+    body.set(key, value);
+    return body;
+  }
+  const data = JSON.parse(body);
+  data[key] = value;
+  return JSON.stringify(data);
 }
 
 function SuggestionChips({ items, onPick }) {
@@ -77,8 +117,11 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
       if (!audio?.size) throw new Error('Chọn file âm thanh trước khi đăng.');
       if (audio.size > 50 * 1024 * 1024) throw new Error('File âm thanh tối đa 50 MB.');
       if (form.get('cover')?.size > 8 * 1024 * 1024) throw new Error('Ảnh bìa tối đa 8 MB.');
-      form.set('duration', String(await durationOf(audio)));
-      await api('/api/users/tracks', { method: 'POST', body: await uploadFiles(form, storage, [['audio', 'audio'], ['cover', 'cover']]) });
+      const [duration, uploadedBody] = await Promise.all([
+        durationOf(audio),
+        uploadFiles(form, storage, [['audio', 'audio'], ['cover', 'cover']])
+      ]);
+      await api('/api/users/tracks', { method: 'POST', body: setBodyField(uploadedBody, 'duration', String(duration)) });
       await refresh(); setComposer(null); setGenreDraft(''); notify('Bài hát đã được đăng.');
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
