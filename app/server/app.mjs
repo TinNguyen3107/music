@@ -280,7 +280,8 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   async function saveChatMessage(req, res) {
     if (!await areFriends(req.user.id, req.params.id)) throw fail('Bạn chỉ có thể trò chuyện với bạn bè.', 403);
     const message = text(req.body.message || '', 2000, false);
-    const attachment = await media(req, 'attachment', 'chat');
+    const hasUploadedChatFile = Boolean(req.file || req.body.attachmentUrl || req.body.attachmentPathname);
+    const attachment = hasUploadedChatFile ? await media(req, 'attachment', 'chat') : '';
     const attachmentName = attachment ? text(req.body.attachmentName || req.file?.originalname || 'Tệp đính kèm', 120, false) : '';
     if (!message && !attachment) throw fail('Vui lòng nhập tin nhắn hoặc chọn file.');
     await query('INSERT INTO chat_messages (id,senderId,recipientId,message,attachment,attachmentName,replyTo,forwardedFrom,reaction,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?)', [makeId(), req.user.id, req.params.id, message, attachment || '', attachmentName, text(req.body.replyTo || '', 60, false), text(req.body.forwardedFrom || '', 60, false), '', new Date().toISOString()]);
