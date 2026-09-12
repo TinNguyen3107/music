@@ -13,7 +13,7 @@ const sqliteSchema = `
   CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY,expires INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY,count INTEGER NOT NULL,until INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS upload_tokens (pathname TEXT PRIMARY KEY,kind TEXT NOT NULL,expires INTEGER NOT NULL,used INTEGER NOT NULL DEFAULT 0);
-  CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,publicId TEXT UNIQUE,avatar TEXT,passwordHash TEXT NOT NULL,salt TEXT NOT NULL,createdAt TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL UNIQUE,publicId TEXT UNIQUE,avatar TEXT,passwordHash TEXT NOT NULL,salt TEXT NOT NULL,lastActiveAt TEXT,createdAt TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS user_sessions (token TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id),expires INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS community_tracks (id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id),title TEXT NOT NULL,artist TEXT NOT NULL,genre TEXT NOT NULL,cover TEXT NOT NULL,audio TEXT NOT NULL,duration REAL NOT NULL,visibility TEXT NOT NULL DEFAULT 'friends' CHECK(visibility IN ('self','friends')),createdAt TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS community_photos (id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id),title TEXT NOT NULL,image TEXT NOT NULL,category TEXT NOT NULL,location TEXT,caption TEXT,date TEXT,visibility TEXT NOT NULL DEFAULT 'friends' CHECK(visibility IN ('self','friends')),createdAt TEXT NOT NULL);
@@ -35,7 +35,7 @@ const postgresSchema = [
   'CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, expires BIGINT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, until BIGINT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS upload_tokens (pathname TEXT PRIMARY KEY, kind TEXT NOT NULL, expires BIGINT NOT NULL, used INTEGER NOT NULL DEFAULT 0)',
-  'CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, "publicId" TEXT UNIQUE, avatar TEXT, "passwordHash" TEXT NOT NULL, salt TEXT NOT NULL, "createdAt" TEXT NOT NULL)',
+  'CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, "publicId" TEXT UNIQUE, avatar TEXT, "passwordHash" TEXT NOT NULL, salt TEXT NOT NULL, "lastActiveAt" TEXT, "createdAt" TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS user_sessions (token TEXT PRIMARY KEY, "userId" TEXT NOT NULL REFERENCES users(id), expires BIGINT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS community_tracks (id TEXT PRIMARY KEY, "userId" TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL, artist TEXT NOT NULL, genre TEXT NOT NULL, cover TEXT NOT NULL, audio TEXT NOT NULL, duration DOUBLE PRECISION NOT NULL, visibility TEXT NOT NULL DEFAULT \'friends\' CHECK(visibility IN (\'self\',\'friends\')), "createdAt" TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS community_photos (id TEXT PRIMARY KEY, "userId" TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL, image TEXT NOT NULL, category TEXT NOT NULL, location TEXT, caption TEXT, date TEXT, visibility TEXT NOT NULL DEFAULT \'friends\' CHECK(visibility IN (\'self\',\'friends\')), "createdAt" TEXT NOT NULL)',
@@ -55,7 +55,7 @@ function pgSql(sql) {
   let index = 0;
   return sql
     .replace(/\?/g, () => `$${++index}`)
-    .replace(/(?<!")\b(playlistId|createdAt|passwordHash|isDemo|userId|friendId|senderId|recipientId|publicId|attachmentName|replyTo|forwardedFrom|readAt)\b(?!")/g, '"$1"');
+    .replace(/(?<!")\b(playlistId|createdAt|passwordHash|isDemo|userId|friendId|senderId|recipientId|publicId|attachmentName|replyTo|forwardedFrom|readAt|lastActiveAt)\b(?!")/g, '"$1"');
 }
 
 async function runCompatibleMigrations(db, production) {
@@ -68,6 +68,7 @@ async function runCompatibleMigrations(db, production) {
   if (production) {
     await add('ALTER TABLE users ADD COLUMN "publicId" TEXT');
     await add('ALTER TABLE users ADD COLUMN avatar TEXT');
+    await add('ALTER TABLE users ADD COLUMN "lastActiveAt" TEXT');
     await add("ALTER TABLE community_tracks ADD COLUMN visibility TEXT NOT NULL DEFAULT 'friends'");
     await add("ALTER TABLE community_photos ADD COLUMN visibility TEXT NOT NULL DEFAULT 'friends'");
     await add('ALTER TABLE chat_messages ADD COLUMN attachment TEXT');
@@ -83,6 +84,7 @@ async function runCompatibleMigrations(db, production) {
   }
   if (!sqliteColumn('users').includes('publicId')) db.native.exec('ALTER TABLE users ADD COLUMN publicId TEXT');
   if (!sqliteColumn('users').includes('avatar')) db.native.exec('ALTER TABLE users ADD COLUMN avatar TEXT');
+  if (!sqliteColumn('users').includes('lastActiveAt')) db.native.exec('ALTER TABLE users ADD COLUMN lastActiveAt TEXT');
   if (!sqliteColumn('community_tracks').includes('visibility')) db.native.exec("ALTER TABLE community_tracks ADD COLUMN visibility TEXT NOT NULL DEFAULT 'friends'");
   if (!sqliteColumn('community_photos').includes('visibility')) db.native.exec("ALTER TABLE community_photos ADD COLUMN visibility TEXT NOT NULL DEFAULT 'friends'");
   if (!sqliteColumn('chat_messages').includes('attachment')) db.native.exec('ALTER TABLE chat_messages ADD COLUMN attachment TEXT');

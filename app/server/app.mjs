@@ -73,7 +73,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   const tokenFrom = req => { const raw = (req.headers.cookie || '').split(';').find(value => value.trim().startsWith('melodik_session=')); return raw ? raw.trim().slice(16) : ''; };
   const session = req => row('SELECT token FROM sessions WHERE token=? AND expires>?', [digest(tokenFrom(req)), Date.now()]);
   const userTokenFrom = req => { const raw = (req.headers.cookie || '').split(';').find(value => value.trim().startsWith('melodik_user=')); return raw ? raw.trim().slice(13) : ''; };
-  const userSession = req => row('SELECT users.id,users.name,users.email,users.publicId,users.avatar FROM user_sessions JOIN users ON users.id=user_sessions.userId WHERE user_sessions.token=? AND user_sessions.expires>?', [digest(userTokenFrom(req)), Date.now()]);
+  const userSession = req => row('SELECT users.id,users.name,users.email,users.publicId,users.avatar,users.lastActiveAt FROM user_sessions JOIN users ON users.id=user_sessions.userId WHERE user_sessions.token=? AND user_sessions.expires>?', [digest(userTokenFrom(req)), Date.now()]);
   const auth = async (req, res, next) => { try { if (!await session(req)) return res.status(401).json({ error: 'Vui lòng đăng nhập quản trị.' }); next(); } catch (error) { next(error); } };
   const authUser = async (req, res, next) => { try { const user = await userSession(req); if (!user) return res.status(401).json({ error: 'Vui lòng đăng nhập để dùng Góc của bạn.' }); req.user = user; next(); } catch (error) { next(error); } };
   async function limit(key, max = 8) {
@@ -93,6 +93,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   const createUserSession = async (res, userId) => {
     const token = randomBytes(32).toString('hex');
     await query('DELETE FROM user_sessions WHERE expires<?', [Date.now()]);
+    await query('UPDATE users SET lastActiveAt=? WHERE id=?', [new Date().toISOString(), userId]);
     await query('INSERT INTO user_sessions (token,userId,expires) VALUES (?,?,?)', [digest(token), userId, Date.now() + 86400000 * 30]);
     res.cookie('melodik_user', token, { httpOnly: true, sameSite: 'strict', secure: production || process.env.COOKIE_SECURE === 'true', maxAge: 86400000 * 30, path: '/' });
   };
@@ -165,7 +166,8 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     if (await row('SELECT id FROM users WHERE publicId=?', [userPublicId])) throw fail('ID này đã có người dùng. Hãy chọn 4 số khác.', 409);
     const userId = makeId(), salt = randomBytes(16).toString('hex');
     const avatar = await media(req, 'avatar', 'image', '/artwork/sleeve.webp');
-    await query('INSERT INTO users (id,name,email,publicId,avatar,passwordHash,salt,createdAt) VALUES (?,?,?,?,?,?,?,?)', [userId, name, mail, userPublicId, avatar, scryptSync(password, salt, 64).toString('hex'), salt, new Date().toISOString()]);
+    const now = new Date().toISOString();
+    await query('INSERT INTO users (id,name,email,publicId,avatar,passwordHash,salt,lastActiveAt,createdAt) VALUES (?,?,?,?,?,?,?,?,?)', [userId, name, mail, userPublicId, avatar, scryptSync(password, salt, 64).toString('hex'), salt, now, now]);
     await createUserSession(res, userId); res.status(201).json({ user: { id: userId, name, email: mail, publicId: userPublicId, avatar } });
   }
   const registerMiddleware = production ? registerUser : [upload.single('avatar'), registerUser];
@@ -175,8 +177,9 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     const mail = email(req.body.email), password = text(req.body.password, 128), user = await row('SELECT * FROM users WHERE email=?', [mail]);
     const hash = scryptSync(password, user?.salt || 'missing-user', 64);
     if (!user || !timingSafeEqual(hash, Buffer.from(user.passwordHash, 'hex'))) throw fail('Email hoặc mật khẩu chưa đúng.', 401);
-    await createUserSession(res, user.id); res.json({ user: { id: user.id, name: user.name, email: user.email, publicId: user.publicId, avatar: user.avatar } });
+    await createUserSession(res, user.id); res.json({ user: { id: user.id, name: user.name, email: user.email, publicId: user.publicId, avatar: user.avatar, lastActiveAt: new Date().toISOString() } });
   });
+  app.post('/api/users/heartbeat', authUser, async (req, res) => { const now = new Date().toISOString(); await query('UPDATE users SET lastActiveAt=? WHERE id=?', [now, req.user.id]); res.json({ ok: true, lastActiveAt: now }); });
   async function updateUserProfile(req, res) {
     const name = text(req.body.name, 80), userPublicId = profileId(req.body.publicId);
     if (await row('SELECT id FROM users WHERE publicId=? AND id<>?', [userPublicId, req.user.id])) throw fail('ID này đã có người dùng. Hãy chọn 4 số khác.', 409);
@@ -266,7 +269,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     if (!term) return res.json({ users: [] });
     res.json({ users: await all('SELECT id,name,publicId,avatar FROM users WHERE id<>? AND lower(name) LIKE ? ORDER BY name LIMIT 12', [req.user.id, `%${term.toLowerCase()}%`]) });
   });
-  app.get('/api/friends', authUser, async (req, res) => res.json(await all("SELECT users.id,users.name,users.publicId,users.avatar,friendships.status,CASE WHEN friendships.userId=? THEN 'outgoing' ELSE 'incoming' END AS direction,(SELECT COUNT(*) FROM chat_messages cm LEFT JOIN chat_reads cr ON cr.userId=? AND cr.friendId=users.id WHERE cm.senderId=users.id AND cm.recipientId=? AND (cr.readAt IS NULL OR cm.createdAt > cr.readAt)) AS unreadCount FROM friendships JOIN users ON users.id=CASE WHEN friendships.userId=? THEN friendships.friendId ELSE friendships.userId END WHERE friendships.userId=? OR friendships.friendId=? ORDER BY CASE WHEN (SELECT COUNT(*) FROM chat_messages cm LEFT JOIN chat_reads cr ON cr.userId=? AND cr.friendId=users.id WHERE cm.senderId=users.id AND cm.recipientId=? AND (cr.readAt IS NULL OR cm.createdAt > cr.readAt)) > 0 THEN 0 ELSE 1 END, friendships.createdAt DESC", [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id])));
+  app.get('/api/friends', authUser, async (req, res) => res.json(await all("SELECT users.id,users.name,users.publicId,users.avatar,users.lastActiveAt,friendships.status,CASE WHEN friendships.userId=? THEN 'outgoing' ELSE 'incoming' END AS direction,(SELECT COUNT(*) FROM chat_messages cm LEFT JOIN chat_reads cr ON cr.userId=? AND cr.friendId=users.id WHERE cm.senderId=users.id AND cm.recipientId=? AND (cr.readAt IS NULL OR cm.createdAt > cr.readAt)) AS unreadCount FROM friendships JOIN users ON users.id=CASE WHEN friendships.userId=? THEN friendships.friendId ELSE friendships.userId END WHERE friendships.userId=? OR friendships.friendId=? ORDER BY CASE WHEN (SELECT COUNT(*) FROM chat_messages cm LEFT JOIN chat_reads cr ON cr.userId=? AND cr.friendId=users.id WHERE cm.senderId=users.id AND cm.recipientId=? AND (cr.readAt IS NULL OR cm.createdAt > cr.readAt)) > 0 THEN 0 ELSE 1 END, friendships.createdAt DESC", [req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id, req.user.id])));
   app.post('/api/friends', authUser, async (req, res) => {
     const friendId = text(req.body.userId, 60); if (friendId === req.user.id) throw fail('Bạn không thể tự kết bạn với mình.');
     if (!await row('SELECT id FROM users WHERE id=?', [friendId])) throw fail('Không tìm thấy người dùng.', 404);
