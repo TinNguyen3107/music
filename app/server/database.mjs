@@ -19,6 +19,7 @@ const sqliteSchema = `
   CREATE TABLE IF NOT EXISTS community_photos (id TEXT PRIMARY KEY,userId TEXT NOT NULL REFERENCES users(id),title TEXT NOT NULL,image TEXT NOT NULL,category TEXT NOT NULL,location TEXT,caption TEXT,date TEXT,visibility TEXT NOT NULL DEFAULT 'friends' CHECK(visibility IN ('self','friends')),createdAt TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS friendships (userId TEXT NOT NULL REFERENCES users(id),friendId TEXT NOT NULL REFERENCES users(id),status TEXT NOT NULL CHECK(status IN ('pending','accepted')),createdAt TEXT NOT NULL,PRIMARY KEY(userId,friendId));
   CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY,senderId TEXT NOT NULL REFERENCES users(id),recipientId TEXT NOT NULL REFERENCES users(id),message TEXT NOT NULL,attachment TEXT,attachmentName TEXT,replyTo TEXT,forwardedFrom TEXT,reaction TEXT,createdAt TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS chat_reads (userId TEXT NOT NULL REFERENCES users(id),friendId TEXT NOT NULL REFERENCES users(id),readAt TEXT NOT NULL,PRIMARY KEY(userId,friendId));
   CREATE TABLE IF NOT EXISTS site_settings (key TEXT PRIMARY KEY,value TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS user_settings (userId TEXT NOT NULL REFERENCES users(id),key TEXT NOT NULL,value TEXT NOT NULL,PRIMARY KEY(userId,key));
 `;
@@ -40,6 +41,7 @@ const postgresSchema = [
   'CREATE TABLE IF NOT EXISTS community_photos (id TEXT PRIMARY KEY, "userId" TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL, image TEXT NOT NULL, category TEXT NOT NULL, location TEXT, caption TEXT, date TEXT, visibility TEXT NOT NULL DEFAULT \'friends\' CHECK(visibility IN (\'self\',\'friends\')), "createdAt" TEXT NOT NULL)',
   "CREATE TABLE IF NOT EXISTS friendships (\"userId\" TEXT NOT NULL REFERENCES users(id), \"friendId\" TEXT NOT NULL REFERENCES users(id), status TEXT NOT NULL CHECK(status IN ('pending','accepted')), \"createdAt\" TEXT NOT NULL, PRIMARY KEY(\"userId\",\"friendId\"))",
   'CREATE TABLE IF NOT EXISTS chat_messages (id TEXT PRIMARY KEY, "senderId" TEXT NOT NULL REFERENCES users(id), "recipientId" TEXT NOT NULL REFERENCES users(id), message TEXT NOT NULL, attachment TEXT, "attachmentName" TEXT, "replyTo" TEXT, "forwardedFrom" TEXT, reaction TEXT, "createdAt" TEXT NOT NULL)',
+  'CREATE TABLE IF NOT EXISTS chat_reads ("userId" TEXT NOT NULL REFERENCES users(id), "friendId" TEXT NOT NULL REFERENCES users(id), "readAt" TEXT NOT NULL, PRIMARY KEY("userId","friendId"))',
   'CREATE TABLE IF NOT EXISTS site_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS user_settings ("userId" TEXT NOT NULL REFERENCES users(id), key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY("userId", key))',
   'CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions (expires)',
@@ -53,7 +55,7 @@ function pgSql(sql) {
   let index = 0;
   return sql
     .replace(/\?/g, () => `$${++index}`)
-    .replace(/(?<!")\b(playlistId|createdAt|passwordHash|isDemo|userId|friendId|senderId|recipientId|publicId|attachmentName|replyTo|forwardedFrom)\b(?!")/g, '"$1"');
+    .replace(/(?<!")\b(playlistId|createdAt|passwordHash|isDemo|userId|friendId|senderId|recipientId|publicId|attachmentName|replyTo|forwardedFrom|readAt)\b(?!")/g, '"$1"');
 }
 
 async function runCompatibleMigrations(db, production) {
@@ -73,6 +75,7 @@ async function runCompatibleMigrations(db, production) {
     await add('ALTER TABLE chat_messages ADD COLUMN "replyTo" TEXT');
     await add('ALTER TABLE chat_messages ADD COLUMN "forwardedFrom" TEXT');
     await add('ALTER TABLE chat_messages ADD COLUMN reaction TEXT');
+    await db.query('CREATE TABLE IF NOT EXISTS chat_reads ("userId" TEXT NOT NULL REFERENCES users(id), "friendId" TEXT NOT NULL REFERENCES users(id), "readAt" TEXT NOT NULL, PRIMARY KEY("userId","friendId"))');
     await db.query("UPDATE users SET \"publicId\"='#0001' WHERE email='user@gmail.com' AND \"publicId\" IS NULL");
     await db.query("UPDATE users SET avatar='/artwork/sleeve.webp' WHERE email='user@gmail.com' AND avatar IS NULL");
     await db.query('CREATE UNIQUE INDEX IF NOT EXISTS users_public_id_idx ON users ("publicId") WHERE "publicId" IS NOT NULL');
@@ -87,6 +90,7 @@ async function runCompatibleMigrations(db, production) {
   if (!sqliteColumn('chat_messages').includes('replyTo')) db.native.exec('ALTER TABLE chat_messages ADD COLUMN replyTo TEXT');
   if (!sqliteColumn('chat_messages').includes('forwardedFrom')) db.native.exec('ALTER TABLE chat_messages ADD COLUMN forwardedFrom TEXT');
   if (!sqliteColumn('chat_messages').includes('reaction')) db.native.exec('ALTER TABLE chat_messages ADD COLUMN reaction TEXT');
+  db.native.exec('CREATE TABLE IF NOT EXISTS chat_reads (userId TEXT NOT NULL REFERENCES users(id),friendId TEXT NOT NULL REFERENCES users(id),readAt TEXT NOT NULL,PRIMARY KEY(userId,friendId))');
   db.native.exec("UPDATE users SET publicId='#0001' WHERE email='user@gmail.com' AND publicId IS NULL");
   db.native.exec("UPDATE users SET avatar='/artwork/sleeve.webp' WHERE email='user@gmail.com' AND avatar IS NULL");
   db.native.exec('CREATE UNIQUE INDEX IF NOT EXISTS users_public_id_idx ON users (publicId) WHERE publicId IS NOT NULL');
