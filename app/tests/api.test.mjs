@@ -36,6 +36,7 @@ test('authenticated content lifecycle, uploads, range playback and persistence',
   assert.equal((await call('/api/auth/setup', 'POST', { email: 'x@example.test', password: 'another-test-password' })).status, 409);
   assert.equal((await call('/api/messages', 'POST', { name: 'Test', email: 'test@example.test', message: 'Hello' }, { Origin: 'https://untrusted.example' })).status, 403);
   assert.equal((await call('/api/auth/login', 'POST', { email: 'test@example.test', password: 'sixsix' }, { Origin: 'http://127.0.0.1:3000' })).status, 200);
+  assert.equal((await call('/api/auth/login', 'POST', { email: 'test@example.test', password: 'sixsix' }, { Origin: 'http://localhost:3000' })).status, 200);
   const playlist = new FormData(); playlist.set('name', 'Test playlist'); playlist.set('description', 'A temporary playlist'); playlist.set('label', 'TEST');
   const createdPlaylist = await call('/api/admin/playlists', 'POST', playlist); assert.equal(createdPlaylist.status, 201);
   const playlistId = createdPlaylist.data.id;

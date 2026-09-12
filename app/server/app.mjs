@@ -26,11 +26,12 @@ const mediaLimits = { audio: 50 * 1024 * 1024, cover: 8 * 1024 * 1024, image: 8 
 
 function extension(file, kind) {
   const bytes = file.buffer;
-  if (kind === 'image') {
+  if (kind === 'image' || kind === 'chat') {
     if (bytes.subarray(0, 3).equals(Buffer.from([255, 216, 255]))) return 'jpg';
     if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'png';
     if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') return 'webp';
-  } else {
+  }
+  if (kind !== 'image') {
     if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WAVE') return 'wav';
     if (bytes.toString('ascii', 0, 3) === 'ID3' || (bytes[0] === 255 && (bytes[1] & 224) === 224)) return 'mp3';
     if (bytes.toString('ascii', 0, 4) === 'OggS') return 'ogg';
@@ -39,7 +40,7 @@ function extension(file, kind) {
     if (kind === 'chat' && bytes.toString('ascii', 0, 4) === '%PDF') return 'pdf';
     if (kind === 'chat' && /^[\x09\x0a\x0d\x20-\x7e]*$/.test(bytes.toString('utf8', 0, Math.min(bytes.length, 2048)))) return 'txt';
   }
-  throw fail(kind === 'image' ? 'Ảnh cần ở định dạng JPG, PNG hoặc WebP.' : 'File cần ở định dạng MP3, WAV, OGG, FLAC, M4A, PDF hoặc TXT.');
+  throw fail(kind === 'image' ? 'Ảnh cần ở định dạng JPG, PNG hoặc WebP.' : 'File cần ở định dạng JPG, PNG, WebP, MP3, WAV, OGG, FLAC, M4A, PDF hoặc TXT.');
 }
 
 export async function createApp({ dataDir = process.env.DATA_DIR || path.join(appRoot, 'data'), seedData = true, seedDefaultAccounts = true, production = process.env.VERCEL === '1' } = {}) {
@@ -59,7 +60,10 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
       try {
         const origin = new URL(req.headers.origin);
         const vercelPreview = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '';
-        allowed = production ? [process.env.APP_ORIGIN, vercelPreview].includes(origin.origin) : origin.hostname === req.hostname;
+        const isLoopback = host => ['localhost', '127.0.0.1', '::1', '[::1]'].includes(host);
+        allowed = production
+          ? [process.env.APP_ORIGIN, vercelPreview].filter(Boolean).includes(origin.origin) || origin.host === req.headers.host
+          : origin.hostname === req.hostname || (isLoopback(origin.hostname) && isLoopback(req.hostname));
       } catch {}
       if (!allowed) return res.status(403).json({ error: 'Yêu cầu không hợp lệ.' });
     }
@@ -73,6 +77,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   const auth = async (req, res, next) => { try { if (!await session(req)) return res.status(401).json({ error: 'Vui lòng đăng nhập quản trị.' }); next(); } catch (error) { next(error); } };
   const authUser = async (req, res, next) => { try { const user = await userSession(req); if (!user) return res.status(401).json({ error: 'Vui lòng đăng nhập để dùng Góc của bạn.' }); req.user = user; next(); } catch (error) { next(error); } };
   async function limit(key, max = 8) {
+    if (!production) return;
     const now = Date.now(), prior = await row('SELECT count,until FROM rate_limits WHERE key=?', [key]);
     const count = !prior || Number(prior.until) < now ? 1 : Number(prior.count) + 1;
     const until = !prior || Number(prior.until) < now ? now + 600000 : Number(prior.until);
@@ -154,7 +159,6 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     res.json({ settings });
   });
   async function registerUser(req, res) {
-    await limit(`register:${req.ip}`, 4);
     const name = text(req.body.name, 80), mail = email(req.body.email), password = text(req.body.password, 128), userPublicId = profileId(req.body.publicId);
     if (password.length < 6) throw fail('Mật khẩu cần ít nhất 6 ký tự.');
     if (await row('SELECT id FROM users WHERE email=?', [mail])) throw fail('Email này đã có tài khoản.', 409);
@@ -272,7 +276,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   });
   app.post('/api/friends/:id/accept', authUser, async (req, res) => { const invite = await row("SELECT userId FROM friendships WHERE userId=? AND friendId=? AND status='pending'", [req.params.id, req.user.id]); if (!invite) throw fail('Không có lời mời phù hợp.', 404); await query("UPDATE friendships SET status='accepted' WHERE userId=? AND friendId=?", [req.params.id, req.user.id]); res.json({ ok: true }); });
   app.post('/api/friends/:id/reject', authUser, async (req, res) => { await query("DELETE FROM friendships WHERE userId=? AND friendId=? AND status='pending'", [req.params.id, req.user.id]); res.json({ ok: true }); });
-  app.get('/api/chat/:id', authUser, async (req, res) => { if (!await areFriends(req.user.id, req.params.id)) throw fail('Bạn chỉ có thể trò chuyện với bạn bè.', 403); res.json(await all('SELECT * FROM chat_messages WHERE (senderId=? AND recipientId=?) OR (senderId=? AND recipientId=?) ORDER BY createdAt ASC LIMIT 200', [req.user.id, req.params.id, req.params.id, req.user.id])); });
+  app.get('/api/chat/:id', authUser, async (req, res) => { if (!await areFriends(req.user.id, req.params.id)) throw fail('B?n ch? c� th? tr� chuy?n v?i b?n b�.', 403); res.json(await all('SELECT c.*, r.attachment AS attachment, r.message AS replyMessage, r.attachmentName AS replyAttachmentName, r.senderId AS replySenderId FROM chat_messages c LEFT JOIN chat_messages r ON c.replyTo = r.id WHERE (c.senderId=? AND c.recipientId=?) OR (c.senderId=? AND c.recipientId=?) ORDER BY c.createdAt ASC LIMIT 200', [req.user.id, req.params.id, req.params.id, req.user.id])); });
   async function saveChatMessage(req, res) {
     if (!await areFriends(req.user.id, req.params.id)) throw fail('Bạn chỉ có thể trò chuyện với bạn bè.', 403);
     const message = text(req.body.message || '', 2000, false);
