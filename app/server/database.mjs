@@ -51,7 +51,9 @@ const postgresSchema = [
 
 function pgSql(sql) {
   let index = 0;
-  return sql.replace(/\?/g, () => `$${++index}`).replace(/\b(playlistId|createdAt|passwordHash|isDemo|userId|friendId|senderId|recipientId|publicId|attachmentName|replyTo|forwardedFrom)\b/g, '"$1"');
+  return sql
+    .replace(/\?/g, () => `$${++index}`)
+    .replace(/(?<!")\b(playlistId|createdAt|passwordHash|isDemo|userId|friendId|senderId|recipientId|publicId|attachmentName|replyTo|forwardedFrom)\b(?!")/g, '"$1"');
 }
 
 async function runCompatibleMigrations(db, production) {

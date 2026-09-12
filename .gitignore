@@ -8,3 +8,6 @@ app/data/
 *.log
 reference/
 *.mp4
+
+.vercel
+.env*
