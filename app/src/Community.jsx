@@ -109,7 +109,13 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
   async function react(message, reaction) { await api(`/api/chat/${message.id}/react`, { method: 'POST', body: JSON.stringify({ reaction }) }); await loadChat(selectedFriend); }
-  const isImageAttachment = item => Boolean(item?.attachment && /\.(jpg|jpeg|png|webp)$/i.test(item.attachment));
+  const isImageAttachment = item => Boolean(
+    item?.attachment &&
+    (
+      /\.(jpg|jpeg|png|webp)(\?|#|$)/i.test(item.attachment) ||
+      /\.(jpg|jpeg|png|webp)$/i.test(item.attachmentName || '')
+    )
+  );
   const shortText = value => value && value.length > 35 ? `${value.slice(0, 35)}…` : value;
   function jumpToMessage(id) {
     const node = document.getElementById(`chat-message-${id}`);
