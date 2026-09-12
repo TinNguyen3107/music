@@ -1,0 +1,12 @@
+{
+  "name": "melodik-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix app run dev",
+    "dev:full": "npm --prefix app run dev",
+    "build": "npm --prefix app run build",
+    "start": "npm --prefix app start",
+    "test": "npm --prefix app test",
+    "migrate": "npm --prefix app run migrate"
+  }
+}

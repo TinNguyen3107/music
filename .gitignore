@@ -1,0 +1,10 @@
+node_modules/
+app/dist/
+app/data/
+.env
+.env.*
+!.env.example
+.vercel/
+*.log
+reference/
+*.mp4

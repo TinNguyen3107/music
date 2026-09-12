@@ -1,0 +1,111 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { createApp } from '../server/app.mjs';
+
+test('authenticated content lifecycle, uploads, range playback and persistence', async t => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), 'melodik-api-test-'));
+  const { app, db } = await createApp({ dataDir, seedDefaultAccounts: false });
+  const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => { server.close(); db.close(); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  let cookie = '';
+  async function call(url, method = 'GET', body, extra = {}) {
+    const headers = { ...(cookie ? { Cookie: cookie } : {}), ...(body && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}), ...extra };
+    const res = await fetch(base + url, { method, headers, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined });
+    return { status: res.status, data: await res.json(), cookie: res.headers.get('set-cookie') };
+  }
+  async function callAs(sessionCookie, url, method = 'GET', body) {
+    const headers = { Cookie: sessionCookie, ...(body && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}) };
+    const res = await fetch(base + url, { method, headers, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined });
+    return { status: res.status, data: await res.json(), cookie: res.headers.get('set-cookie') };
+  }
+  const initial = (await call('/api/catalog')).data;
+  assert.equal(initial.tracks.length, 12);
+  assert.deepEqual((await call('/api/config')).data.storage, 'local');
+  assert.equal((await call('/api/auth/me')).data.requiresSetupToken, false);
+  assert.equal((await call('/api/admin/messages')).status, 401);
+  assert.equal((await call('/api/admin/tracks', 'POST')).status, 401);
+  assert.equal((await call('/api/auth/setup', 'POST', { email: 'test@example.test', password: 'five5' })).status, 400);
+  const setup = await call('/api/auth/setup', 'POST', { email: 'test@example.test', password: 'sixsix' });
+  assert.equal(setup.status, 201); assert.match(setup.cookie, /HttpOnly/); assert.match(setup.cookie, /SameSite=Strict/);
+  cookie = setup.cookie.split(';')[0];
+  assert.equal((await call('/api/auth/me')).data.authenticated, true);
+  assert.equal((await call('/api/auth/setup', 'POST', { email: 'x@example.test', password: 'another-test-password' })).status, 409);
+  assert.equal((await call('/api/messages', 'POST', { name: 'Test', email: 'test@example.test', message: 'Hello' }, { Origin: 'https://untrusted.example' })).status, 403);
+  assert.equal((await call('/api/auth/login', 'POST', { email: 'test@example.test', password: 'sixsix' }, { Origin: 'http://127.0.0.1:3000' })).status, 200);
+  const playlist = new FormData(); playlist.set('name', 'Test playlist'); playlist.set('description', 'A temporary playlist'); playlist.set('label', 'TEST');
+  const createdPlaylist = await call('/api/admin/playlists', 'POST', playlist); assert.equal(createdPlaylist.status, 201);
+  const playlistId = createdPlaylist.data.id;
+  const createTrackForm = () => { const f = new FormData(); for (const [k, v] of Object.entries({ title: 'My uploaded music', artist: 'Local test', genre: 'Ambient', playlistId, duration: '36' })) f.set(k, v); return f; };
+  const malformed = createTrackForm(); malformed.set('audio', new Blob(['<script>not music</script>'], { type: 'audio/mpeg' }), 'fake.mp3');
+  assert.equal((await call('/api/admin/tracks', 'POST', malformed)).status, 400);
+  const upload = createTrackForm(); const wav = readFileSync(path.join(dataDir, 'uploads/demo-0-0.wav'));
+  upload.set('audio', new Blob([wav], { type: 'audio/wav' }), 'valid.wav');
+  const createdTrack = await call('/api/admin/tracks', 'POST', upload); assert.equal(createdTrack.status, 201);
+  const uploaded = (await call('/api/catalog')).data.tracks.find(track => track.id === createdTrack.data.id);
+  assert.equal(uploaded.isDemo, 0); assert.equal(uploaded.title, 'My uploaded music');
+  const range = await fetch(base + uploaded.audio, { headers: { Range: 'bytes=0-43' } });
+  assert.equal(range.status, 206); assert.equal((await range.arrayBuffer()).byteLength, 44);
+  const edit = createTrackForm(); edit.set('title', 'Renamed track');
+  assert.equal((await call(`/api/admin/tracks/${uploaded.id}`, 'PUT', edit)).status, 200);
+  assert.equal((await call(`/api/admin/playlists/${playlistId}`, 'DELETE')).status, 409);
+  const photo = new FormData(); for (const [k, v] of Object.entries({ title: 'Test photo', category: 'Đời thường', location: 'Studio', caption: 'A test memory', date: '2026-09-10' })) photo.set(k, v);
+  photo.set('image', new Blob([readFileSync(new URL('../public/artwork/coffee.webp', import.meta.url))], { type: 'image/webp' }), 'coffee.webp');
+  const createdPhoto = await call('/api/admin/photos', 'POST', photo); assert.equal(createdPhoto.status, 201);
+  const interfaceImage = new FormData(); interfaceImage.set('image', new Blob([readFileSync(new URL('../public/artwork/tea.webp', import.meta.url))], { type: 'image/webp' }), 'tea.webp');
+  assert.equal((await call('/api/admin/settings/communityImage', 'POST', interfaceImage)).status, 200);
+  assert.match((await call('/api/catalog')).data.settings.communityImage, /^\/media\//);
+  const firstUser = await call('/api/users/register', 'POST', { name: 'Listener One', publicId: '#1001', email: 'listener1@example.test', password: 'Listener-one-passphrase-2026' });
+  assert.equal(firstUser.status, 201); const userCookie = firstUser.cookie.split(';')[0];
+  const communityTrack = new FormData(); for (const [k, v] of Object.entries({ title: 'Community song', artist: '', genre: 'Bedroom', duration: '36', visibility: 'self' })) communityTrack.set(k, v);
+  communityTrack.set('audio', new Blob([wav], { type: 'audio/wav' }), 'community.wav');
+  assert.equal((await callAs(userCookie, '/api/users/tracks', 'POST', communityTrack)).status, 201);
+  const communityPhoto = new FormData(); for (const [k, v] of Object.entries({ title: 'Community photo', category: 'Life', location: 'Home', caption: 'A shared moment', date: '2026-09-11', visibility: 'friends' })) communityPhoto.set(k, v);
+  communityPhoto.set('image', new Blob([readFileSync(new URL('../public/artwork/tea.webp', import.meta.url))], { type: 'image/webp' }), 'tea.webp');
+  assert.equal((await callAs(userCookie, '/api/users/photos', 'POST', communityPhoto)).status, 201);
+  const communityInterfaceImage = new FormData(); communityInterfaceImage.set('image', new Blob([readFileSync(new URL('../public/artwork/flowers.webp', import.meta.url))], { type: 'image/webp' }), 'flowers.webp');
+  assert.equal((await callAs(userCookie, '/api/users/settings/guestbookImage', 'POST', communityInterfaceImage)).status, 200);
+  assert.match((await callAs(userCookie, '/api/users/settings')).data.settings.guestbookImage, /^\/media\//);
+  assert.deepEqual((await call('/api/users/settings')).data.settings, {});
+  assert.equal((await callAs(userCookie, '/api/catalog')).data.communityTracks.length, 1);
+  assert.equal((await callAs(userCookie, '/api/catalog')).data.communityPhotos.length, 1);
+  const secondUser = await call('/api/users/register', 'POST', { name: 'Listener Two', publicId: '#1002', email: 'listener2@example.test', password: 'Listener-two-passphrase-2026' });
+  const secondCookie = secondUser.cookie.split(';')[0];
+  assert.equal((await callAs(userCookie, '/api/users/find?q=Listener')).data.users.some(user => user.publicId === '#1002'), true);
+  assert.equal((await callAs(userCookie, '/api/friends', 'POST', { userId: secondUser.data.user.id })).status, 201);
+  assert.equal((await callAs(secondCookie, `/api/friends/${firstUser.data.user.id}/accept`, 'POST')).status, 200);
+  assert.equal((await callAs(userCookie, `/api/chat/${secondUser.data.user.id}`, 'POST', { message: 'Chào bạn!' })).status, 201);
+  assert.equal((await callAs(secondCookie, `/api/chat/${firstUser.data.user.id}`)).data[0].message, 'Chào bạn!');
+  assert.equal((await call('/api/messages', 'POST', { name: 'Guest', email: 'guest@example.test', message: 'A private note' })).status, 201);
+  const messages = (await call('/api/admin/messages')).data; assert.equal(messages[0].message, 'A private note');
+  assert.equal((await call('/api/messages')).status, 404);
+  // A second app instance opens the same durable database: records and sessions survive.
+  const reopened = await createApp({ dataDir, seedDefaultAccounts: false });
+  assert.equal(reopened.db.native.prepare('SELECT title FROM tracks WHERE id=?').get(uploaded.id).title, 'Renamed track');
+  assert.equal(reopened.db.native.prepare('SELECT COUNT(*) AS n FROM messages').get().n, 1); await reopened.db.close();
+  assert.equal((await call(`/api/admin/tracks/${uploaded.id}`, 'DELETE')).status, 200);
+  assert.equal((await call(`/api/admin/playlists/${playlistId}`, 'DELETE')).status, 200);
+  assert.equal((await call(`/api/admin/photos/${createdPhoto.data.id}`, 'DELETE')).status, 200);
+  assert.equal((await call(`/api/admin/messages/${messages[0].id}`, 'DELETE')).status, 200);
+  await call('/api/auth/logout', 'POST'); assert.equal((await call('/api/admin/messages')).status, 401);
+  assert.equal((await call('/api/auth/login', 'POST', { email: 'test@example.test', password: 'bad-password' })).status, 401);
+  assert.equal((await call('/api/auth/login', 'POST', { email: 'test@example.test', password: 'sixsix' })).status, 200);
+  db.native.exec('DELETE FROM tracks; DELETE FROM playlists;');
+  const emptied = await createApp({ dataDir, seedDefaultAccounts: false });
+  assert.equal(emptied.db.native.prepare('SELECT COUNT(*) AS n FROM playlists').get().n, 0, 'Do not restore demo content after admin empties library');
+  await emptied.db.close();
+});
+
+test('local demo seeds the requested sample accounts only', async t => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), 'melodik-default-accounts-'));
+  const { app, db } = await createApp({ dataDir });
+  const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => { server.close(); db.close(); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  async function signIn(url, body) { const response = await fetch(base + url, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'http://127.0.0.1:3000' }, body: JSON.stringify(body) }); return response.status; }
+  assert.equal(await signIn('/api/auth/login', { email: 'admin@gmail.com', password: 'admin123' }), 200);
+  assert.equal(await signIn('/api/users/login', { email: 'user@gmail.com', password: 'user123' }), 200);
+});

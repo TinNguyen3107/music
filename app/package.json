@@ -1,0 +1,29 @@
+{
+  "name": "app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "start": "node server/index.mjs",
+    "test": "node --test tests/api.test.mjs",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:sites": "node --test tests/sites-worker.test.mjs",
+    "migrate": "node server/migrate.mjs"
+  },
+  "dependencies": {
+    "@fontsource/nunito": "^5.2.7",
+    "@fontsource/quicksand": "^5.2.8",
+    "@neondatabase/serverless": "^1.1.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "@vercel/blob": "^2.8.0",
+    "@vitejs/plugin-react": "5.0.4",
+    "express": "^5.1.0",
+    "multer": "^2.0.2",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "vite": "6.4.2"
+  }
+}
