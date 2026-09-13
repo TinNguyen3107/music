@@ -147,6 +147,8 @@ function ProfileCard({ user, activity, isSelf, onImage }) {
 export function Community({ catalog, refresh, notify, me: appUser, onUserChange, personalSettings = {}, onPersonalSettingsChange }) {
   const [me, setMe] = useState(appUser), [ready, setReady] = useState(false), [mode, setMode] = useState('login'), [error, setError] = useState(''), [showPassword, setShowPassword] = useState(false);
   const [storage, setStorage] = useState({ storage: 'local' }), [composer, setComposer] = useState(null), [friends, setFriends] = useState([]), [selectedFriend, setSelectedFriend] = useState(null), [chat, setChat] = useState([]), [busy, setBusy] = useState(false), [imageViewer, setImageViewer] = useState(null), [profileViewer, setProfileViewer] = useState(null), [clock, setClock] = useState(Date.now());
+  const [prevFriends, setPrevFriends] = useState([]);
+  const [prevChatLength, setPrevChatLength] = useState(0);
   const [search, setSearch] = useState(''), [results, setResults] = useState([]), [replyTo, setReplyTo] = useState(null), [attachmentFile, setAttachmentFile] = useState(null);
   const [genreDraft, setGenreDraft] = useState(''), [categoryDraft, setCategoryDraft] = useState('');
   const [cameraFacing, setCameraFacing] = useState('environment'), [cameraStream, setCameraStream] = useState(null), [cameraPhoto, setCameraPhoto] = useState(null), [cameraPreview, setCameraPreview] = useState(''), [cameraStep, setCameraStep] = useState('capture'), [isMobileCamera, setIsMobileCamera] = useState(false);
@@ -199,6 +201,41 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     const timer = setInterval(() => loadChat(selectedFriend).catch(() => {}), 2000);
     return () => clearInterval(timer);
   }, [selectedFriend?.id]);
+
+  // Check for friend request acceptance and new messages
+  useEffect(() => {
+    if (!me) return;
+
+    // Check for new friend acceptances
+    if (prevFriends.length > 0) {
+      const newlyAccepted = friends.filter(friend =>
+        friend.status === 'accepted' &&
+        !prevFriends.some(prev => prev.id === friend.id && prev.status === 'accepted')
+      );
+
+      newlyAccepted.forEach(friend => {
+        notify(`${friend.name} đã chấp nhận lời mời kết bạn của bạn!`);
+      });
+    }
+
+    // Check for new messages
+    if (selectedFriend && chat.length > prevChatLength) {
+      const newMessages = chat.slice(prevChatLength);
+      newMessages.forEach(message => {
+        if (message.senderId !== me?.id) { // Only notify for messages from others
+          const senderName = message.senderId === me?.id ? 'Bạn' : (selectedFriend?.name || 'Bạn bè');
+          const messagePreview = message.message ||
+            (message.attachmentName || 'Tệp đính kèm') ||
+            'Tin nhắn';
+          notify(`${senderName}: ${messagePreview}`);
+        }
+      });
+    }
+
+    // Update prev states
+    setPrevFriends([...friends]);
+    setPrevChatLength(chat.length);
+  }, [friends, chat, me, selectedFriend, notify]);
   useEffect(() => { if (chatLogRef.current) chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight; }, [chat]);
   useEffect(() => {
     cameraStreamRef.current = cameraStream;
