@@ -7,7 +7,10 @@ export function InstallAppPrompt() {
   const [collapsed, setCollapsed] = useState(false);
   const [standalone, setStandalone] = useState(false);
 
-  const isIos = useMemo(() => /iphone|ipad|ipod/i.test(navigator.userAgent || ''), []);
+  const userAgent = navigator.userAgent || '';
+  const isIos = useMemo(() => /iphone|ipad|ipod/i.test(userAgent), [userAgent]);
+  const isMobile = useMemo(() => /android|iphone|ipad|ipod|mobile|fban|fbav|messenger|zalo/i.test(userAgent), [userAgent]);
+  const isInAppBrowser = useMemo(() => /fban|fbav|messenger|instagram|zalo/i.test(userAgent), [userAgent]);
 
   useEffect(() => {
     const updateStandalone = () => setStandalone(
@@ -31,7 +34,7 @@ export function InstallAppPrompt() {
     };
   }, []);
 
-  if (standalone || (!installEvent && !isIos)) return null;
+  if (standalone || (!installEvent && !isMobile)) return null;
 
   async function install() {
     if (!installEvent) return;
@@ -47,10 +50,16 @@ export function InstallAppPrompt() {
     </button>;
   }
 
+  const fallbackGuide = isInAppBrowser
+    ? 'Bạn đang mở trong Messenger/Zalo. Bấm dấu ⋯ ở góc trên → Mở bằng Chrome/Safari, rồi chọn Thêm vào màn hình chính.'
+    : isIos
+      ? 'iPhone: bấm Chia sẻ → Thêm vào Màn hình chính.'
+      : 'Android: mở menu trình duyệt ⋮ → Thêm vào màn hình chính.';
+
   return <aside className="install-app-prompt" aria-label="Cài MIUZIG">
     <div>
       <strong>Cài MIUZIG trên điện thoại</strong>
-      <span>{isIos && !installEvent ? 'iPhone: bấm Chia sẻ → Thêm vào Màn hình chính.' : 'Mở nhanh như app, dùng camera để chụp kỷ niệm.'}</span>
+      <span>{installEvent ? 'Mở nhanh như app, dùng camera để chụp kỷ niệm.' : fallbackGuide}</span>
     </div>
     {installEvent && <button type="button" className="button primary" onClick={install}><DownloadSimple size={17} /> Cài app</button>}
     <IconButton icon={X} label="Thu gọn gợi ý cài app" onClick={() => setCollapsed(true)} />
