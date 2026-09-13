@@ -54,7 +54,19 @@ export function App() {
   const refresh = useCallback(async () => { try { const data = await api('/api/catalog'); setCatalog(data); setLoadError(''); return data; } catch (e) { setLoadError(e.message); } }, []);
   useEffect(() => { refreshCurrentUser(); refreshUserSettings(); refresh(); }, [refreshCurrentUser, refreshUserSettings, refresh]);
   useEffect(() => { const handle = () => setRoute(location.pathname); window.addEventListener('popstate', handle); return () => window.removeEventListener('popstate', handle); }, []);
-  useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(''), 4500); return () => clearTimeout(timer); }, [toast]);
+  useEffect(() => {
+  if (!toast) return;
+  const timer = setTimeout(() => {
+    // Remove show class to trigger exit animation
+    const toastEl = document.querySelector('.toast');
+    if (toastEl) {
+      toastEl.classList.remove('show');
+    }
+    // Wait for exit animation to complete before removing from DOM
+    setTimeout(() => setToast(''), 200); // Match exit animation duration (0.2s)
+  }, 4500);
+  return () => clearTimeout(timer);
+}, [toast]);
   useEffect(() => { if (catalog && !current) { shouldPlay.current = false; setCurrentId(allCatalogTracks[0]?.id || null); } }, [catalog, current, allCatalogTracks.length]);
   useEffect(() => { audio.current.volume = volume; try { localStorage.setItem('melodik.volume', JSON.stringify(volume)); } catch {} }, [volume]);
   // Stop audio when current track becomes null (e.g., track was deleted)
@@ -104,6 +116,6 @@ export function App() {
     <footer className="site-footer"><div><a className="wordmark small" href="/" onClick={e => { e.preventDefault(); navigate('/'); }}>MIUZIG</a><p>Một chút nhạc. Một chút bình yên.</p></div><span className="footer-note">Made for slow days <Heart size={14} /></span><a href="/admin" onClick={e => { e.preventDefault(); navigate('/admin'); }}>Quản trị <ArrowUpRight size={14} /></a></footer>
     {!['/', '/music'].includes(route) && current && (miniPlayerCollapsed ? <button className="mini-player-dock" aria-label="Mở trình phát nhạc" onClick={() => setMiniPlayerCollapsed(false)}><MusicNotes size={21} /></button> : <div className="mini-player"><img src={currentCover || current.cover} alt="" /><div className="mini-title"><strong>{current.title}</strong><span>{current.artist || current.owner}</span></div><div className="mini-controls"><IconButton icon={SkipBack} label="Bài trước" onClick={() => skip(-1)} /><IconButton className="primary" icon={playing ? Pause : Play} label={playing ? 'Tạm dừng' : 'Phát nhạc'} onClick={toggle} /><IconButton icon={SkipForward} label="Bài tiếp theo" onClick={() => skip(1)} /></div><input aria-label="Tiến trình phát nhạc" type="range" min="0" max={duration || current.duration} value={Math.min(elapsed, duration || current.duration)} step=".1" onChange={e => seek(e.target.value)} /><span className="mono">{time(elapsed)}</span><button className="mini-return" onClick={() => navigate('/music')}>Góc nhạc <ArrowUpRight size={16} /></button><IconButton className="mini-collapse" icon={CaretDown} label="Thu gọn trình phát" onClick={() => setMiniPlayerCollapsed(true)} /></div>)}
     {!isAdmin && <InstallAppPrompt />}
-    {toast && <div role="status" className="toast">{toast}<IconButton icon={X} label="Đóng thông báo" onClick={() => setToast('')} /></div>}
+    {toast && <div role="status" className="toast show">{toast}<IconButton icon={X} label="Đóng thông báo" onClick={() => setToast('')} /></div>}
   </>;
 }
