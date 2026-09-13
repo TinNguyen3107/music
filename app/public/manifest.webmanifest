@@ -1,0 +1,31 @@
+{
+  "name": "MIUZIG",
+  "short_name": "MIUZIG",
+  "description": "Một góc nhỏ để nghe nhạc, lưu kỷ niệm và trò chuyện cùng bạn bè.",
+  "start_url": "/music",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3fbfa",
+  "theme_color": "#0f9488",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Góc của bạn",
+      "short_name": "Cá nhân",
+      "url": "/community"
+    },
+    {
+      "name": "Kỷ niệm",
+      "short_name": "Kỷ niệm",
+      "url": "/gallery"
+    }
+  ]
+}
