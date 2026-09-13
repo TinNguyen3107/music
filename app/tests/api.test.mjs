@@ -75,6 +75,9 @@ test('authenticated content lifecycle, uploads, range playback and persistence',
   assert.equal((await callAs(userCookie, '/api/catalog')).data.communityPhotos.length, 1);
   const secondUser = await call('/api/users/register', 'POST', { name: 'Listener Two', publicId: '#1002', email: 'listener2@example.test', password: 'Listener-two-passphrase-2026' });
   const secondCookie = secondUser.cookie.split(';')[0];
+  const adminUsers = await call('/api/admin/users');
+  assert.equal(adminUsers.status, 200);
+  assert.equal(adminUsers.data.some(user => user.email === 'listener1@example.test' && user.createdAt), true);
   assert.equal((await callAs(userCookie, '/api/users/find?q=Listener')).data.users.some(user => user.publicId === '#1002'), true);
   assert.equal((await callAs(userCookie, '/api/friends', 'POST', { userId: secondUser.data.user.id })).status, 201);
   assert.equal((await callAs(secondCookie, `/api/friends/${firstUser.data.user.id}/accept`, 'POST')).status, 200);

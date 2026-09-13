@@ -1,79 +1,193 @@
-import React, { useEffect, useState } from 'react';
-import { ArrowRight, CircleNotch, Disc, EnvelopeSimple, Eye, EyeSlash, Images, ImageSquare, LockKey, MusicNotes, PencilSimple, Plus, SignOut, Trash, UploadSimple } from '@phosphor-icons/react';
-import { upload as uploadToBlob } from '@vercel/blob/client';
-import { api, IconButton, Modal, time } from './shared.jsx';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, SignOut, UserCircle, UsersThree } from '@phosphor-icons/react';
+import { api } from './shared.jsx';
 
-const sections = [{ id: 'tracks', name: 'Bài hát', icon: MusicNotes }, { id: 'playlists', name: 'Playlist', icon: Disc }, { id: 'photos', name: 'Kỷ niệm', icon: Images }, { id: 'messages', name: 'Lời nhắn', icon: EnvelopeSimple }];
-const imageAccept = 'image/jpeg,image/png,image/webp';
-function getDuration(file) {
-  return new Promise((resolve, reject) => {
-    const a = new Audio(), url = URL.createObjectURL(file);
-    const cleanup = () => { clearTimeout(timeout); a.removeAttribute('src'); a.load(); URL.revokeObjectURL(url); };
-    const timeout = setTimeout(() => { cleanup(); reject(new Error('Không đọc được thời lượng. Hãy thử file MP3 hoặc WAV khác.')); }, 15000);
-    a.onloadedmetadata = () => { const duration = a.duration; a.onloadedmetadata = null; a.onerror = null; cleanup(); Number.isFinite(duration) && duration > 0 ? resolve(duration) : reject(new Error('File không có thời lượng hợp lệ.')); };
-    a.onerror = () => { a.onerror = null; cleanup(); reject(new Error('Trình duyệt chưa đọc được file âm thanh này.')); };
-    a.src = url;
-  });
+const activeWindowMs = 60 * 1000;
+
+function formatDate(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Chưa rõ';
+  return date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-export function Admin({ catalog, refresh, notify }) {
-  const [auth, setAuth] = useState(null), [authError, setAuthError] = useState(''), [showPassword, setShowPassword] = useState(false);
-  const [storage, setStorage] = useState({ storage: 'local' });
-  const [section, setSection] = useState('tracks'), [messages, setMessages] = useState([]);
-  const [editor, setEditor] = useState(null), [deleting, setDeleting] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const check = () => api('/api/auth/me').then(setAuth).catch(e => setAuthError(e.message));
-  useEffect(() => { check(); api('/api/config').then(setStorage).catch(() => {}); }, []);
-  const loadMessages = () => api('/api/admin/messages').then(setMessages).catch(e => notify(e.message));
-  useEffect(() => { if (auth?.authenticated) loadMessages(); }, [auth?.authenticated]);
-  async function signIn(e) { e.preventDefault(); setBusy(true); setAuthError(''); const values = Object.fromEntries(new FormData(e.currentTarget)); try { await api(`/api/auth/${auth.needsSetup ? 'setup' : 'login'}`, { method: 'POST', body: JSON.stringify(values) }); await check(); } catch (err) { setAuthError(err.message); } finally { setBusy(false); } }
-  async function logout() { try { await api('/api/auth/logout', { method: 'POST' }); setAuth({ authenticated: false, needsSetup: false }); setMessages([]); } catch (e) { notify(e.message); } }
-  async function save(e) {
-    e.preventDefault(); setBusy(true); setError('');
+function activityText(value) {
+  const time = Date.parse(value || '');
+  if (!Number.isFinite(time)) return { online: false, text: 'Chưa hoạt động' };
+  const diff = Math.max(0, Date.now() - time);
+  if (diff < activeWindowMs) return { online: true, text: 'Đang hoạt động' };
+  const minutes = Math.max(1, Math.floor(diff / 60000));
+  if (minutes < 60) return { online: false, text: `Hoạt động ${minutes} phút trước` };
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return { online: false, text: `Hoạt động ${hours} giờ trước` };
+  return { online: false, text: `Lần cuối ${new Date(time).toLocaleDateString('vi-VN')}` };
+}
+
+function StatCard({ icon: Icon, label, value, note }) {
+  return <article className="admin-stat-card">
+    <span><Icon size={22} /></span>
+    <div>
+      <strong>{value}</strong>
+      <p>{label}</p>
+      {note && <small>{note}</small>}
+    </div>
+  </article>;
+}
+
+export function Admin({ notify }) {
+  const [auth, setAuth] = useState(null);
+  const [authError, setAuthError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const check = () => api('/api/auth/me').then(setAuth).catch(error => setAuthError(error.message));
+
+  async function loadUsers() {
+    setLoadingUsers(true);
     try {
-      const form = new FormData(e.currentTarget);
-      for (const [key, value] of [...form.entries()]) if (value instanceof File && !value.size) form.delete(key);
-      const audio = form.get('audio');
-      if (audio) { if (audio.size > 50 * 1024 * 1024) throw new Error('File âm thanh tối đa 50 MB.'); form.set('duration', String(await getDuration(audio))); }
-      for (const key of ['cover', 'image']) if (form.get(key)?.size > 8 * 1024 * 1024) throw new Error('Ảnh tối đa 8 MB.');
-      let body = form;
-      if (storage.storage === 'blob') {
-        const fields = section === 'tracks' ? [['audio', 'audio'], ['cover', 'cover']] : section === 'playlists' ? [['cover', 'cover']] : [['image', 'image']];
-        for (const [field, kind] of fields) {
-          const file = form.get(field);
-          if (!(file instanceof File) || !file.size) continue;
-          const suffix = file.name.includes('.') ? `.${file.name.split('.').pop().replace(/[^a-z0-9]/gi, '').slice(0, 8)}` : '';
-          const blob = await uploadToBlob(`melodik/${kind}/${crypto.randomUUID()}${suffix}`, file, { access: 'public', contentType: file.type || undefined, handleUploadUrl: '/api/admin/upload-token', clientPayload: JSON.stringify({ kind }) });
-          form.delete(field); form.set(`${field}Url`, blob.url); form.set(`${field}Pathname`, blob.pathname);
-        }
-        body = JSON.stringify(Object.fromEntries(form));
-      }
-      await api(`/api/admin/${section}${editor.id ? `/${editor.id}` : ''}`, { method: editor.id ? 'PUT' : 'POST', body });
-      await refresh(); setEditor(null); notify('Đã lưu. Nội dung đã có trên trang nghe nhạc.');
-    } catch (err) { setError(err.message); } finally { setBusy(false); }
+      setUsers(await api('/api/admin/users'));
+    } catch (error) {
+      notify?.(error.message);
+    } finally {
+      setLoadingUsers(false);
+    }
   }
-  async function saveSiteImage(e, key) {
-    e.preventDefault(); setBusy(true); setError('');
+
+  useEffect(() => { check(); }, []);
+  useEffect(() => { if (auth?.authenticated) loadUsers(); }, [auth?.authenticated]);
+
+  async function signIn(event) {
+    event.preventDefault();
+    setBusy(true);
+    setAuthError('');
+    const values = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      const form = new FormData(e.currentTarget), file = form.get('image');
-      if (!file?.size) throw new Error('Chọn ảnh JPG, PNG hoặc WebP trước khi lưu.');
-      if (file.size > 8 * 1024 * 1024) throw new Error('Ảnh tối đa 8 MB.');
-      let body = form;
-      if (storage.storage === 'blob') {
-        const suffix = file.name.includes('.') ? `.${file.name.split('.').pop().replace(/[^a-z0-9]/gi, '').slice(0, 8)}` : '';
-        const blob = await uploadToBlob(`melodik/image/${crypto.randomUUID()}${suffix}`, file, { access: 'public', contentType: file.type || undefined, handleUploadUrl: '/api/admin/upload-token', clientPayload: JSON.stringify({ kind: 'image' }) });
-        body = JSON.stringify({ imageUrl: blob.url, imagePathname: blob.pathname });
-      }
-      await api(`/api/admin/settings/${key}`, { method: 'POST', body }); await refresh(); notify('Đã thay ảnh giao diện.');
-    } catch (e) { setError(e.message); } finally { setBusy(false); }
+      await api(`/api/auth/${auth.needsSetup ? 'setup' : 'login'}`, { method: 'POST', body: JSON.stringify(values) });
+      await check();
+    } catch (error) {
+      setAuthError(error.message);
+    } finally {
+      setBusy(false);
+    }
   }
-  async function remove() { setBusy(true); setError(''); try { await api(`/api/admin/${section}/${deleting.id}`, { method: 'DELETE' }); await refresh(); if (section === 'messages') await loadMessages(); setDeleting(null); notify('Đã xóa nội dung khỏi thư viện.'); } catch (e) { setError(e.message); } finally { setBusy(false); } }
+
+  async function logout() {
+    try {
+      await api('/api/auth/logout', { method: 'POST' });
+      setAuth({ authenticated: false, needsSetup: false });
+      setUsers([]);
+    } catch (error) {
+      notify?.(error.message);
+    }
+  }
+
+  const stats = useMemo(() => {
+    const today = new Date().toLocaleDateString('vi-VN');
+    return {
+      total: users.length,
+      online: users.filter(user => activityText(user.lastActiveAt).online).length,
+      today: users.filter(user => new Date(user.createdAt).toLocaleDateString('vi-VN') === today).length,
+    };
+  }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return users;
+    return users.filter(user => [user.name, user.email, user.publicId].some(value => String(value || '').toLowerCase().includes(term)));
+  }, [users, query]);
+
   if (!auth) return <div className="empty-state">{authError ? <><p role="alert">{authError}</p><button className="button secondary" onClick={check}>Thử lại</button></> : <CircleNotch size={30} className="spin" />}</div>;
-  if (!auth.authenticated) return <section className="auth-layout"><div className="auth-copy"><span className="eyebrow"><LockKey size={15} /> MIUZIG STUDIO</span><h1>Chăm chút<br />góc nhạc <span>của bạn.</span></h1><p>Trang này chỉ dành cho quản trị viên. Thành viên muốn đăng nhạc, kết bạn hoặc chat hãy vào Góc cộng đồng.</p><img src="/artwork/desk.webp" alt="Góc làm việc yên tĩnh" /></div><form className="auth-form" onSubmit={signIn}><span className="genre-label">QUẢN TRỊ VIÊN</span><h2>{auth.needsSetup ? 'Tạo tài khoản quản trị' : 'Chào mừng trở lại.'}</h2><p>{auth.needsSetup ? 'Thiết lập một lần để quản lý thư viện của bạn.' : 'Đăng nhập bằng tài khoản quản trị.'}</p><label>Email<input type="email" name="email" required autoComplete="username" maxLength={254} placeholder="admin@gmail.com" /></label><label className="password-field">Mật khẩu<span className="password-input"><input type={showPassword ? 'text' : 'password'} name="password" required minLength={auth.needsSetup ? 6 : 1} maxLength={128} autoComplete={auth.needsSetup ? 'new-password' : 'current-password'} placeholder={auth.needsSetup ? 'Ít nhất 6 ký tự' : 'Mật khẩu quản trị'} /><button type="button" aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}</button></span></label>{auth.needsSetup && auth.requiresSetupToken && <label className="password-field">Mã thiết lập<span className="password-input"><input type={showPassword ? 'text' : 'password'} name="setupToken" required autoComplete="one-time-code" placeholder="Mã chỉ dùng cho lần thiết lập đầu" /><button type="button" aria-label={showPassword ? 'Ẩn mã thiết lập' : 'Hiện mã thiết lập'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}</button></span></label>}{authError && <p className="form-error" role="alert">{authError}</p>}<button className="button primary wide" disabled={busy}>{busy ? <CircleNotch className="spin" size={18} /> : <LockKey size={18} />}{auth.needsSetup ? 'Tạo tài khoản & bắt đầu' : 'Đăng nhập quản trị'}<ArrowRight size={17} /></button><a className="auth-community-link" href="/community">Bạn là thành viên? Vào Góc cộng đồng</a></form></section>;
-  const items = section === 'messages' ? messages : catalog[section];
-  const currentSection = sections.find(s => s.id === section);
-  return <><div className="admin-heading"><div><div className="eyebrow">MIUZIG STUDIO</div><h1>Thư viện của bạn.</h1></div><button className="button secondary" onClick={logout}><SignOut size={18} /> Đăng xuất</button></div><div className="admin-layout"><aside className="admin-sidebar">{sections.map(({ id, name, icon: Icon }) => <button className={section === id ? 'selected' : ''} onClick={() => { setSection(id); setError(''); }} key={id}><Icon size={20} /><span>{name}</span><small>{id === 'messages' ? messages.length : catalog[id].length}</small></button>)}<button onClick={() => { setError(''); setEditor({ settings: true }); }}><ImageSquare size={20} /><span>Ảnh giao diện</span></button><p>Thay đổi được lưu ngay vào thư viện.</p></aside><section className="admin-panel"><div className="admin-toolbar"><h2>{currentSection.name} <span>{items.length}</span></h2>{section !== 'messages' && <button className="button primary" disabled={section === 'tracks' && !catalog.playlists.length} onClick={() => { setError(''); setEditor({}); }}><Plus size={18} /> Thêm {section === 'tracks' ? 'bài hát' : section === 'photos' ? 'kỷ niệm' : 'playlist'}</button>}</div>{section === 'tracks' && !catalog.playlists.length && <p className="form-error">Tạo một playlist trước khi thêm bài hát.</p>}{items.length ? <div className="admin-list">{items.map(item => <div className={`admin-row ${section === 'messages' ? 'message-row' : ''}`} key={item.id}>{section !== 'messages' && <img src={item.cover || item.image} alt="" />}<div className="admin-row-content"><strong>{item.title || item.name}</strong><p>{section === 'tracks' ? `${item.artist} · ${time(item.duration)} · ${catalog.playlists.find(p => p.id === item.playlistId)?.name || ''}` : section === 'playlists' ? `${catalog.tracks.filter(t => t.playlistId === item.id).length} bài hát · ${item.description}` : section === 'photos' ? `${item.category} · ${item.location}` : `${item.email} · ${new Date(item.createdAt).toLocaleString('vi-VN')}`}</p>{section === 'messages' && <div className="message-content">{item.message}</div>}{section === 'tracks' && !!item.isDemo && <span className="demo-badge">Nhạc nghe thử</span>}</div><div className="row-actions">{section !== 'messages' && <IconButton icon={PencilSimple} label={`Sửa ${item.title || item.name}`} onClick={() => { setError(''); setEditor(item); }} />}<IconButton icon={Trash} label={`Xóa ${item.title || item.name}`} onClick={() => { setError(''); setDeleting(item); }} /></div></div>)}</div> : <div className="empty-state"><currentSection.icon size={32} /><h3>{section === 'messages' ? 'Chưa có lời nhắn nào.' : 'Một trang mới, đang chờ bạn.'}</h3><p>{section === 'messages' ? 'Lời chào từ sổ lưu bút sẽ xuất hiện ở đây.' : 'Bấm nút thêm để bắt đầu.'}</p></div>}</section></div>
-    {editor && !editor.settings && <Modal title={`${editor.id ? 'Chỉnh sửa' : 'Thêm'} ${section === 'tracks' ? 'bài hát' : section === 'photos' ? 'kỷ niệm' : 'playlist'}`} onClose={() => { if (!busy) setEditor(null); }}><form className="editor-form" onSubmit={save}>{section === 'tracks' ? <><label>Tên bài hát<input name="title" defaultValue={editor.title} required maxLength={120} /></label><div className="form-grid"><label>Nghệ sĩ<input name="artist" defaultValue={editor.artist} required maxLength={120} /></label><label>Thể loại<input name="genre" defaultValue={editor.genre || 'Lo-Fi'} required maxLength={50} /></label></div><label>Playlist<select name="playlistId" defaultValue={editor.playlistId || catalog.playlists[0]?.id} required>{catalog.playlists.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label><label className="file-field"><UploadSimple size={24} /><strong>{editor.id ? 'Thay file âm thanh (tùy chọn)' : 'Chọn file âm thanh'}</strong><span>MP3, WAV, OGG, FLAC, M4A · tối đa 50 MB</span><input name="audio" type="file" accept="audio/*,.flac,.m4a" required={!editor.id} /></label><label>Ảnh bìa (tùy chọn)<input name="cover" type="file" accept={imageAccept} /></label><p className="form-footnote">Chỉ tải lên bản ghi bạn sở hữu hoặc được phép sử dụng.</p></> : section === 'playlists' ? <><label>Tên playlist<input name="name" defaultValue={editor.name} required maxLength={80} /></label><label>Dòng nhãn nhỏ<input name="label" defaultValue={editor.label || 'MỘT PLAYLIST NHỎ'} maxLength={80} required /></label><label>Mô tả<textarea name="description" defaultValue={editor.description} rows={3} maxLength={500} /></label><label>Ảnh bìa (tùy chọn)<input name="cover" type="file" accept={imageAccept} /></label></> : <><label>Tên kỷ niệm<input name="title" defaultValue={editor.title} required maxLength={120} /></label><div className="form-grid"><label>Nhóm<select name="category" defaultValue={editor.category || 'Đời thường'}>{['Đời thường', 'Đi đó đây', 'Ngày đặc biệt'].map(c => <option key={c}>{c}</option>)}</select></label><label>Ngày<input type="date" name="date" defaultValue={editor.date || new Date().toISOString().slice(0, 10)} required /></label></div><label>Địa điểm<input name="location" defaultValue={editor.location} maxLength={150} /></label><label>Câu chuyện nhỏ<textarea name="caption" defaultValue={editor.caption} rows={3} maxLength={1000} /></label><label>Ảnh · JPG, PNG, WebP, tối đa 8 MB<input type="file" name="image" accept={imageAccept} required={!editor.id} /></label></>}{error && <p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><button type="button" className="button secondary" disabled={busy} onClick={() => setEditor(null)}>Hủy</button><button className="button primary" disabled={busy}>{busy && <CircleNotch className="spin" size={18} />}{busy ? 'Đang lưu…' : 'Lưu vào thư viện'}</button></div></form></Modal>}
-    {editor?.settings && <Modal title="Ảnh giao diện" onClose={() => { if (!busy) setEditor(null); }}><div className="appearance-settings"><form onSubmit={event => saveSiteImage(event, 'communityImage')}><img src={catalog.settings?.communityImage || '/artwork/flowers.webp'} alt="Ảnh hiện ở Góc cộng đồng" /><p>Hiện ở màn đăng nhập Góc cộng đồng.</p><input name="image" type="file" accept={imageAccept} required /><button className="button primary wide" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu ảnh cộng đồng'}</button></form><form onSubmit={event => saveSiteImage(event, 'guestbookImage')}><img src={catalog.settings?.guestbookImage || '/artwork/coffee.webp'} alt="Ảnh hiện ở Sổ lưu bút" /><p>Hiện ở phần giới thiệu của Sổ lưu bút.</p><input name="image" type="file" accept={imageAccept} required /><button className="button primary wide" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu ảnh sổ lưu bút'}</button></form></div>{error && <p className="form-error" role="alert">{error}</p>}</Modal>}
-    {deleting && <Modal title="Xóa nội dung này?" onClose={() => { if (!busy) setDeleting(null); }}><p>“{deleting.title || deleting.name}” sẽ được gỡ khỏi {currentSection.name.toLowerCase()}.</p>{section === 'playlists' && <p className="muted">Playlist phải trống trước khi xóa.</p>}{error && <p className="form-error" role="alert">{error}</p>}<div className="modal-actions"><button className="button secondary" disabled={busy} onClick={() => setDeleting(null)}>Giữ lại</button><button className="button danger" disabled={busy} onClick={remove}>{busy ? 'Đang xóa…' : 'Xóa nội dung'}</button></div></Modal>}
+
+  if (!auth.authenticated) return <section className="auth-layout">
+    <div className="auth-copy">
+      <span className="eyebrow"><LockKey size={15} /> MIUZIG STUDIO</span>
+      <h1>Quản lý<br /><span>người dùng.</span></h1>
+      <p>Trang này chỉ dành cho quản trị viên để xem tài khoản thành viên, thời gian tạo tài khoản và trạng thái hoạt động.</p>
+      <img src="/artwork/desk.webp" alt="Góc quản trị MIUZIG" />
+    </div>
+    <form className="auth-form" onSubmit={signIn}>
+      <span className="genre-label">QUẢN TRỊ VIÊN</span>
+      <h2>{auth.needsSetup ? 'Tạo tài khoản quản trị' : 'Chào mừng trở lại.'}</h2>
+      <p>{auth.needsSetup ? 'Thiết lập một lần để quản lý người dùng MIUZIG.' : 'Đăng nhập bằng tài khoản quản trị.'}</p>
+      <label>Email<input type="email" name="email" required autoComplete="username" maxLength={254} placeholder="admin@gmail.com" /></label>
+      <label className="password-field">Mật khẩu<span className="password-input"><input type={showPassword ? 'text' : 'password'} name="password" required minLength={auth.needsSetup ? 6 : 1} maxLength={128} autoComplete={auth.needsSetup ? 'new-password' : 'current-password'} placeholder={auth.needsSetup ? 'Ít nhất 6 ký tự' : 'Mật khẩu quản trị'} /><button type="button" aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}</button></span></label>
+      {auth.needsSetup && auth.requiresSetupToken && <label className="password-field">Mã thiết lập<span className="password-input"><input type={showPassword ? 'text' : 'password'} name="setupToken" required autoComplete="one-time-code" placeholder="Mã chỉ dùng cho lần thiết lập đầu" /><button type="button" aria-label={showPassword ? 'Ẩn mã thiết lập' : 'Hiện mã thiết lập'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}</button></span></label>}
+      {authError && <p className="form-error" role="alert">{authError}</p>}
+      <button className="button primary wide" disabled={busy}>{busy ? <CircleNotch className="spin" size={18} /> : <LockKey size={18} />}{auth.needsSetup ? 'Tạo tài khoản & bắt đầu' : 'Đăng nhập quản trị'}<ArrowRight size={17} /></button>
+      <a className="auth-community-link" href="/community">Bạn là thành viên? Vào Góc của bạn</a>
+    </form>
+  </section>;
+
+  return <>
+    <div className="admin-heading">
+      <div>
+        <div className="eyebrow">MIUZIG STUDIO</div>
+        <h1>Quản lý người dùng.</h1>
+      </div>
+      <button className="button secondary" onClick={logout}><SignOut size={18} /> Đăng xuất</button>
+    </div>
+
+    <div className="admin-users-dashboard">
+      <section className="admin-stats">
+        <StatCard icon={UsersThree} label="Tài khoản đã tạo" value={stats.total} note="Tổng số thành viên" />
+        <StatCard icon={Clock} label="Đang hoạt động" value={stats.online} note="Trong khoảng 1 phút gần đây" />
+        <StatCard icon={CalendarBlank} label="Tạo hôm nay" value={stats.today} note={new Date().toLocaleDateString('vi-VN')} />
+      </section>
+
+      <section className="admin-panel admin-users-panel">
+        <div className="admin-toolbar">
+          <div>
+            <h2>Người dùng <span>{filteredUsers.length}</span></h2>
+            <p>Xem ai đã tạo tài khoản, tạo lúc nào và hoạt động gần nhất.</p>
+          </div>
+          <div className="admin-user-tools">
+            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm tên, email hoặc ID..." />
+            <button className="button secondary" onClick={loadUsers} disabled={loadingUsers}>{loadingUsers ? <CircleNotch className="spin" size={17} /> : 'Tải lại'}</button>
+          </div>
+        </div>
+
+        {loadingUsers && !users.length ? <div className="empty-state"><CircleNotch className="spin" size={30} /><p>Đang tải người dùng…</p></div> : filteredUsers.length ? <div className="admin-users-table-wrap">
+          <table className="admin-users-table">
+            <thead>
+              <tr>
+                <th>Người dùng</th>
+                <th>Email</th>
+                <th>Ngày tạo</th>
+                <th>Hoạt động</th>
+                <th>Nội dung</th>
+                <th>Bạn bè</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUsers.map(user => {
+                const activity = activityText(user.lastActiveAt);
+                return <tr key={user.id}>
+                  <td>
+                    <span className="admin-user-cell">
+                      <img src={user.avatar || '/artwork/sleeve.webp'} alt="" />
+                      <span>
+                        <strong>{user.name}</strong>
+                        <small>{user.publicId || '#0000'}</small>
+                      </span>
+                    </span>
+                  </td>
+                  <td>{user.email}</td>
+                  <td>{formatDate(user.createdAt)}</td>
+                  <td><span className={`admin-status ${activity.online ? 'online' : ''}`}>{activity.text}</span></td>
+                  <td>{Number(user.trackCount || 0)} bài · {Number(user.photoCount || 0)} kỷ niệm</td>
+                  <td>{Number(user.friendCount || 0)}</td>
+                </tr>;
+              })}
+            </tbody>
+          </table>
+        </div> : <div className="empty-state">
+          <UserCircle size={34} />
+          <h3>Chưa có người dùng phù hợp.</h3>
+          <p>{query ? 'Thử tìm bằng tên, email hoặc ID khác.' : 'Khi thành viên đăng ký, tài khoản sẽ xuất hiện ở đây.'}</p>
+        </div>}
+      </section>
+    </div>
   </>;
 }

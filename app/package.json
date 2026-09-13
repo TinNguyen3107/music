@@ -11,7 +11,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:sites": "node --test tests/sites-worker.test.mjs",
-    "migrate": "node server/migrate.mjs"
+    "migrate": "node server/migrate.mjs",
+    "mock:friends": "node scripts/seed-mock-friends.mjs"
   },
   "dependencies": {
     "@fontsource/nunito": "^5.2.7",
