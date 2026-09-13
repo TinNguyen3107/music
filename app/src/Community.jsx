@@ -104,7 +104,7 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
   const [storage, setStorage] = useState({ storage: 'local' }), [composer, setComposer] = useState(null), [friends, setFriends] = useState([]), [selectedFriend, setSelectedFriend] = useState(null), [chat, setChat] = useState([]), [busy, setBusy] = useState(false), [imageViewer, setImageViewer] = useState(null), [profileViewer, setProfileViewer] = useState(null), [clock, setClock] = useState(Date.now());
   const [search, setSearch] = useState(''), [results, setResults] = useState([]), [replyTo, setReplyTo] = useState(null), [attachmentFile, setAttachmentFile] = useState(null);
   const [genreDraft, setGenreDraft] = useState(''), [categoryDraft, setCategoryDraft] = useState('');
-  const [cameraFacing, setCameraFacing] = useState('environment'), [cameraStream, setCameraStream] = useState(null), [cameraPhoto, setCameraPhoto] = useState(null), [cameraPreview, setCameraPreview] = useState('');
+  const [cameraFacing, setCameraFacing] = useState('environment'), [cameraStream, setCameraStream] = useState(null), [cameraPhoto, setCameraPhoto] = useState(null), [cameraPreview, setCameraPreview] = useState(''), [cameraStep, setCameraStep] = useState('capture'), [isMobileCamera, setIsMobileCamera] = useState(false);
   const [registerId, setRegisterId] = useState(randomPublicId), fileRef = useRef(null), chatLogRef = useRef(null), cameraVideoRef = useRef(null), cameraCanvasRef = useRef(null), cameraStreamRef = useRef(null);
   const myTracks = useMemo(() => (catalog.communityTracks || []).filter(track => track.userId === me?.id), [catalog.communityTracks, me?.id]);
   const myPhotos = useMemo(() => (catalog.communityPhotos || []).filter(photo => photo.userId === me?.id), [catalog.communityPhotos, me?.id]);
@@ -159,6 +159,13 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     cameraStreamRef.current = cameraStream;
     if (cameraVideoRef.current && cameraStream) cameraVideoRef.current.srcObject = cameraStream;
   }, [cameraStream]);
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 760px)');
+    const update = () => setIsMobileCamera(query.matches);
+    update();
+    query.addEventListener?.('change', update);
+    return () => query.removeEventListener?.('change', update);
+  }, []);
   useEffect(() => () => stopCamera(), []);
   useEffect(() => () => { if (cameraPreview) URL.revokeObjectURL(cameraPreview); }, [cameraPreview]);
 
@@ -221,6 +228,7 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
   async function openCameraComposer() {
     setError('');
     setCameraPhoto(null);
+    setCameraStep('capture');
     if (cameraPreview) { URL.revokeObjectURL(cameraPreview); setCameraPreview(''); }
     setComposer('camera');
     try { await startCamera(cameraFacing); }
@@ -242,10 +250,12 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     if (cameraPreview) URL.revokeObjectURL(cameraPreview);
     setCameraPhoto(file);
     setCameraPreview(URL.createObjectURL(file));
+    setCameraStep(isMobileCamera ? 'review' : 'details');
     stopCamera();
   }
   async function retakeCameraPhoto() {
     setCameraPhoto(null);
+    setCameraStep('capture');
     if (cameraPreview) { URL.revokeObjectURL(cameraPreview); setCameraPreview(''); }
     try { await startCamera(cameraFacing); }
     catch (e) { setError(e.message || 'Không mở lại được camera.'); }
@@ -253,6 +263,7 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
   function closeCameraComposer() {
     stopCamera();
     setCameraPhoto(null);
+    setCameraStep('capture');
     if (cameraPreview) { URL.revokeObjectURL(cameraPreview); setCameraPreview(''); }
     if (!busy) setComposer(null);
   }
@@ -308,6 +319,38 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     {composer === 'profile' && <Modal title="Chỉnh hồ sơ" onClose={() => !busy && setComposer(null)}><form className="editor-form" onSubmit={saveProfile}><label>Tên hiển thị<input name="name" required maxLength={80} defaultValue={me.name} /></label><label>ID cá nhân<input name="publicId" required pattern="#[0-9]{4}" maxLength={5} defaultValue={me.publicId || ''} title="ID có dạng # và 4 chữ số (ví dụ: #1234)" /></label><p className="form-footnote">Nếu ID bị trùng, hệ thống sẽ báo để bạn chọn 4 số khác.</p><label>Bio / Giới thiệu<textarea name="bio" maxLength={280} rows={4} defaultValue={me.bio || ''} placeholder="Viết vài dòng về bạn, gu nhạc, điều bạn thích..." /></label><label>Avatar<input name="avatar" type="file" accept={imageAccept} /></label><button className="button primary wide" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu hồ sơ'}</button></form></Modal>}
     {composer === 'track' && <Modal title="Đăng một bài hát" onClose={() => !busy && setComposer(null)}><form className="editor-form" onSubmit={submitTrack}><label>Tên bài hát<input name="title" required maxLength={120} /></label><label>Nghệ sĩ<input name="artist" maxLength={120} placeholder="Có thể để trống" /></label><label>Thể loại tự thêm<input name="genre" required maxLength={50} value={genreDraft} onChange={e => setGenreDraft(e.target.value)} placeholder="Ví dụ: lofi, ballad, tự thu..." /></label><SuggestionChips items={genreSuggestions} onPick={setGenreDraft} /><label>Hiển thị<select name="visibility" defaultValue="self"><option value="self">Chỉ mình tôi</option><option value="friends">Bạn bè đã kết bạn</option></select></label><label className="file-field"><MusicNotes size={24} /><strong>File âm thanh</strong><span>MP3, WAV, OGG, FLAC, M4A · tối đa 50 MB</span><input name="audio" type="file" accept={audioAccept} required /></label><label>Ảnh bìa<input name="cover" type="file" accept={imageAccept} /></label><p className="form-footnote">Chỉ đăng file bạn sở hữu hoặc được phép chia sẻ.</p><button className="button primary wide" disabled={busy}>{busy ? 'Đang đăng…' : 'Chia sẻ bài hát'}</button></form></Modal>}
     {composer === 'photo' && <Modal title="Đăng một kỷ niệm" onClose={() => !busy && setComposer(null)}><form className="editor-form" onSubmit={submitPhoto}><label>Tiêu đề<input name="title" required maxLength={120} /></label><label>Danh mục tự thêm<input name="category" required maxLength={50} value={categoryDraft} onChange={e => setCategoryDraft(e.target.value)} placeholder="Ví dụ: du lịch, bạn bè, sinh nhật..." /></label><SuggestionChips items={categorySuggestions} onPick={setCategoryDraft} /><label>Hiển thị<select name="visibility" defaultValue="self"><option value="self">Chỉ mình tôi</option><option value="friends">Bạn bè đã kết bạn</option></select></label><label>Ảnh<input name="image" type="file" accept={imageAccept} required /></label><label>Địa điểm<input name="location" maxLength={150} /></label><label>Câu chuyện nhỏ<textarea name="caption" maxLength={1000} rows={3} /></label><label>Ngày<input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label><button className="button primary wide" disabled={busy}>{busy ? 'Đang đăng…' : 'Chia sẻ kỷ niệm'}</button></form></Modal>}
-    {composer === 'camera' && <Modal title="Chụp một kỷ niệm" onClose={closeCameraComposer} className="camera-modal"><form className="editor-form" onSubmit={submitCameraPhoto}><div className="camera-stage">{cameraPreview ? <img src={cameraPreview} alt="Ảnh vừa chụp" /> : <video ref={cameraVideoRef} autoPlay playsInline muted />}{!cameraStream && !cameraPreview && <div className="camera-placeholder"><Camera size={34} /><span>Camera chưa mở. Hãy cấp quyền camera rồi thử lại.</span></div>}<canvas ref={cameraCanvasRef} hidden /></div><div className="camera-actions">{cameraPreview ? <button type="button" className="button secondary" onClick={retakeCameraPhoto}>Chụp lại</button> : <><button type="button" className="button secondary" onClick={flipCamera}><ArrowsClockwise size={17} /> Đổi camera</button><button type="button" className="button primary" onClick={captureCameraPhoto}><Camera size={17} /> Chụp ảnh</button></>}</div><label>Tiêu đề<input name="title" required maxLength={120} placeholder="Ví dụ: Một buổi chiều thật đẹp" /></label><label>Danh mục tự thêm<input name="category" required maxLength={50} value={categoryDraft} onChange={e => setCategoryDraft(e.target.value)} placeholder="Ví dụ: du lịch, bạn bè, sinh nhật..." /></label><SuggestionChips items={categorySuggestions} onPick={setCategoryDraft} /><label>Hiển thị<select name="visibility" defaultValue="self"><option value="self">Chỉ mình tôi</option><option value="friends">Bạn bè đã kết bạn</option></select></label><label>Địa điểm<input name="location" maxLength={150} /></label><label>Câu chuyện nhỏ<textarea name="caption" maxLength={1000} rows={3} /></label><label>Ngày<input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label><button className="button primary wide" disabled={busy || !cameraPhoto}>{busy ? 'Đang đăng…' : 'Đăng kỷ niệm từ camera'}</button><p className="form-footnote">Camera hoạt động trên HTTPS như link Vercel hoặc trên localhost. Ảnh sau khi đăng sẽ hiển thị trong Kỷ niệm như ảnh upload thường.</p></form></Modal>}
+    {composer === 'camera' && <Modal title={cameraStep === 'details' ? 'Thêm nội dung kỷ niệm' : 'Chụp một kỷ niệm'} onClose={closeCameraComposer} className={`camera-modal ${isMobileCamera ? 'camera-mobile-flow' : ''} camera-step-${cameraStep}`}>
+      <form className="editor-form camera-form" onSubmit={submitCameraPhoto}>
+        <div className="camera-capture-panel">
+          <div className="camera-stage">
+            {cameraPreview ? <img src={cameraPreview} alt="Ảnh vừa chụp" /> : <video ref={cameraVideoRef} autoPlay playsInline muted />}
+            {!cameraStream && !cameraPreview && <div className="camera-placeholder"><Camera size={34} /><span>Camera chưa mở. Hãy cấp quyền camera rồi thử lại.</span></div>}
+            <canvas ref={cameraCanvasRef} hidden />
+          </div>
+          <div className="camera-actions">
+            {cameraPreview ? <>
+              <button type="button" className="button secondary" onClick={retakeCameraPhoto}>Chụp lại</button>
+              {isMobileCamera && cameraStep === 'review' && <button type="button" className="button primary" onClick={() => setCameraStep('details')}>Dùng ảnh này</button>}
+            </> : <>
+              <button type="button" className="button secondary" onClick={flipCamera}><ArrowsClockwise size={17} /> Đổi camera</button>
+              <button type="button" className="button primary" onClick={captureCameraPhoto}><Camera size={17} /> Chụp ảnh</button>
+            </>}
+          </div>
+        </div>
+        {(!isMobileCamera || cameraStep === 'details') && <div className="camera-details-panel">
+          {isMobileCamera && cameraPreview && <button type="button" className="text-button camera-back" onClick={() => setCameraStep('review')}>← Quay lại xem ảnh / chụp lại</button>}
+          {cameraPreview && <button type="button" className="camera-small-preview" onClick={() => setCameraStep('review')}><img src={cameraPreview} alt="Ảnh đã chọn" /><span>Xem ảnh đã chụp</span></button>}
+          <label>Tiêu đề<input name="title" required maxLength={120} placeholder="Ví dụ: Một buổi chiều thật đẹp" /></label>
+          <label>Danh mục tự thêm<input name="category" required maxLength={50} value={categoryDraft} onChange={e => setCategoryDraft(e.target.value)} placeholder="Ví dụ: du lịch, bạn bè, sinh nhật..." /></label>
+          <SuggestionChips items={categorySuggestions} onPick={setCategoryDraft} />
+          <label>Hiển thị<select name="visibility" defaultValue="self"><option value="self">Chỉ mình tôi</option><option value="friends">Bạn bè đã kết bạn</option></select></label>
+          <label>Địa điểm<input name="location" maxLength={150} /></label>
+          <label>Câu chuyện nhỏ<textarea name="caption" maxLength={1000} rows={3} /></label>
+          <label>Ngày<input name="date" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label>
+          <button className="button primary wide" disabled={busy || !cameraPhoto}>{busy ? 'Đang đăng…' : 'Đăng kỷ niệm từ camera'}</button>
+          <p className="form-footnote">Camera hoạt động trên HTTPS như link Vercel hoặc trên localhost. Ảnh sau khi đăng sẽ hiển thị trong Kỷ niệm như ảnh upload thường.</p>
+        </div>}
+      </form>
+    </Modal>}
   </>;
 }
