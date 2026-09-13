@@ -65,8 +65,8 @@ export function Music({ catalog, player: p, me, personalSettings = {}, onPersona
 
   return <>
     <section className="music-intro"><div><div className="eyebrow"><Sparkle size={14} /> YOUR LITTLE LISTENING ROOM</div><h1>Dreamy <span>Jukebox</span><span className="heading-star"><Sparkle weight="regular" /></span></h1><p>Bật một giai điệu từ chính bạn hoặc từ bạn bè đã kết nối.</p></div><div className="intro-note"><Headphones size={23} /><span>Một góc nhỏ,<br />dành riêng cho bạn.</span></div></section>
-    {!me && <div className="empty-state compact"><MusicNotes size={30} /><p>Đăng nhập để xem nhạc cá nhân và nhạc bạn bè chia sẻ.</p></div>}
-    {me && !playlists.length && <div className="empty-state compact"><MusicNotes size={30} /><p>Chưa có bài hát nào. Vào Góc của bạn để đăng bài đầu tiên.</p></div>}
+    {!me && <div className="empty-state compact" style={{ marginBottom: '80px' }}><MusicNotes size={30} /><p>Đăng nhập để xem nhạc cá nhân và nhạc bạn bè chia sẻ.</p></div>}
+    {me && !playlists.length && <div className="empty-state compact" style={{ marginBottom: '80px' }}><MusicNotes size={30} /><p>Chưa có bài hát nào. Vào Góc của bạn để đăng bài đầu tiên.</p></div>}
     {me && playlists.length > 0 && <>
       <div className="mood-tabs" aria-label="Danh mục nhạc của bạn">{playlists.map((playlist, i) => <button key={playlist.id} className={selected?.id === playlist.id ? 'selected' : ''} aria-pressed={selected?.id === playlist.id} onClick={() => { setPlaylistId(playlist.id); setSearch(''); }}>{i === 0 && <Disc size={16} />}{playlist.name}</button>)}</div>
       <section className="listening-room" aria-label="Máy phát nhạc">
