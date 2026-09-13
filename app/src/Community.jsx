@@ -65,6 +65,27 @@ function sharpenCanvas(canvas, amount = .34) {
   } catch {}
 }
 
+async function enhanceCameraBlob(blob) {
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const maxSide = 2400;
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    sharpenCanvas(canvas, .24);
+    const jpeg = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .94));
+    return jpeg || blob;
+  } catch {
+    return blob;
+  }
+}
+
 function durationOf(file) {
   return new Promise((resolve, reject) => {
     const audio = new Audio(), url = URL.createObjectURL(file);
@@ -248,8 +269,9 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: { ideal: facing },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+        width: { ideal: isMobileCamera ? 1440 : 1920 },
+        height: { ideal: isMobileCamera ? 2560 : 1080 },
+        aspectRatio: { ideal: isMobileCamera ? 9 / 16 : 16 / 9 },
         frameRate: { ideal: 30 }
       },
       audio: false
@@ -272,19 +294,37 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     try { await startCamera(cameraFacing === 'environment' ? 'user' : 'environment'); }
     catch (e) { setError(e.message || 'Không đổi được camera.'); }
   }
+  async function focusCamera(event) {
+    const stream = cameraStreamRef.current, track = stream?.getVideoTracks?.()[0], rect = event.currentTarget.getBoundingClientRect();
+    if (!track?.applyConstraints || !rect.width || !rect.height) return;
+    const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+    await track.applyConstraints({ advanced: [{ focusMode: 'single-shot' }, { pointsOfInterest: [{ x, y }] }] }).catch(() => {});
+    window.setTimeout(() => track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}), 900);
+  }
   async function captureCameraPhoto() {
+    const stream = cameraStreamRef.current, track = stream?.getVideoTracks?.()[0];
     const video = cameraVideoRef.current, canvas = cameraCanvasRef.current;
-    if (!video || !canvas || !video.videoWidth) return setError('Camera chưa sẵn sàng, thử chờ thêm một chút.');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    sharpenCanvas(canvas);
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .95));
+    let blob = null;
+    if (track && 'ImageCapture' in window) {
+      try {
+        const capture = new ImageCapture(track);
+        blob = await capture.takePhoto();
+      } catch {}
+    }
+    if (!blob) {
+      if (!video || !canvas || !video.videoWidth) return setError('Camera chưa sẵn sàng, thử chờ thêm một chút.');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .95));
+    }
     if (!blob) return setError('Không chụp được ảnh. Hãy thử lại.');
-    const file = new File([blob], `miuzig-camera-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
+    const enhanced = await enhanceCameraBlob(blob);
+    const file = new File([enhanced], `miuzig-camera-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
     if (cameraPreview) URL.revokeObjectURL(cameraPreview);
     setCameraPhoto(file);
     setCameraPreview(URL.createObjectURL(file));
@@ -360,9 +400,10 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     {composer === 'camera' && <Modal title={cameraStep === 'details' ? 'Thêm nội dung kỷ niệm' : 'Chụp một kỷ niệm'} onClose={closeCameraComposer} className={`camera-modal ${isMobileCamera ? 'camera-mobile-flow' : ''} camera-step-${cameraStep}`}>
       <form className="editor-form camera-form" onSubmit={submitCameraPhoto}>
         <div className="camera-capture-panel">
-          <div className="camera-stage">
+          <div className="camera-stage" onPointerUp={focusCamera}>
             {cameraPreview ? <img src={cameraPreview} alt="Ảnh vừa chụp" /> : <video ref={cameraVideoRef} autoPlay playsInline muted />}
             {!cameraStream && !cameraPreview && <div className="camera-placeholder"><Camera size={34} /><span>Camera chưa mở. Hãy cấp quyền camera rồi thử lại.</span></div>}
+            {cameraStream && !cameraPreview && <span className="camera-focus-hint">Chạm vào ảnh để lấy nét</span>}
             <canvas ref={cameraCanvasRef} hidden />
           </div>
           <div className="camera-actions">

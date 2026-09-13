@@ -50,3 +50,5 @@
   .community-actions .button{font-size:.86rem}
   .friend-search input{font-size:.95rem}
 }
+
+.camera-focus-hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:2;border:1px solid #ffffff55;border-radius:999px;background:#143f42b8;color:#fff;padding:7px 12px;font-size:.76rem;font-weight:800;box-shadow:0 8px 18px #00000024;pointer-events:none}
