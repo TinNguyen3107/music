@@ -24,7 +24,8 @@ async function optimizeImageFile(file, kind) {
   if (!file?.type?.startsWith('image/') || file.size < 350 * 1024) return file;
   try {
     const bitmap = await createImageBitmap(file);
-    const maxSide = kind === 'avatar' ? 512 : kind === 'chat' ? 1400 : 1600;
+    const isCameraShot = /^miuzig-camera-/i.test(file.name || '');
+    const maxSide = kind === 'avatar' ? 512 : kind === 'chat' ? 1400 : isCameraShot ? 1920 : 1600;
     const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
     if (scale === 1 && file.size < 1024 * 1024) return file;
     const canvas = document.createElement('canvas');
@@ -32,13 +33,36 @@ async function optimizeImageFile(file, kind) {
     canvas.height = Math.max(1, Math.round(bitmap.height * scale));
     canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close?.();
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', .82));
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', isCameraShot ? .9 : .82));
     if (!blob || blob.size >= file.size) return file;
     const name = file.name.replace(/\.[^.]+$/, '') || 'image';
     return new File([blob], `${name}.webp`, { type: 'image/webp', lastModified: Date.now() });
   } catch {
     return file;
   }
+}
+
+function sharpenCanvas(canvas, amount = .34) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx || !canvas.width || !canvas.height) return;
+  try {
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const src = image.data;
+    const out = new Uint8ClampedArray(src);
+    const width = canvas.width, height = canvas.height;
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const i = (y * width + x) * 4;
+        for (let c = 0; c < 3; c++) {
+          const center = src[i + c];
+          const blur = (src[i - 4 + c] + src[i + 4 + c] + src[i - width * 4 + c] + src[i + width * 4 + c]) / 4;
+          out[i + c] = Math.max(0, Math.min(255, center + (center - blur) * amount));
+        }
+      }
+    }
+    image.data.set(out);
+    ctx.putImageData(image, 0, 0);
+  } catch {}
 }
 
 function durationOf(file) {
@@ -221,7 +245,17 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
   async function startCamera(facing = cameraFacing) {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Trình duyệt này chưa hỗ trợ mở camera.');
     stopCamera();
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } }, audio: false });
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: facing },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        frameRate: { ideal: 30 }
+      },
+      audio: false
+    });
+    const track = stream.getVideoTracks?.()[0];
+    await track?.applyConstraints?.({ advanced: [{ focusMode: 'continuous' }, { exposureMode: 'continuous' }] }).catch(() => {});
     setCameraFacing(facing);
     setCameraStream(stream);
   }
@@ -243,8 +277,12 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     if (!video || !canvas || !video.videoWidth) return setError('Camera chưa sẵn sàng, thử chờ thêm một chút.');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .9));
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    sharpenCanvas(canvas);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .95));
     if (!blob) return setError('Không chụp được ảnh. Hãy thử lại.');
     const file = new File([blob], `miuzig-camera-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
     if (cameraPreview) URL.revokeObjectURL(cameraPreview);
