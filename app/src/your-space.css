@@ -96,3 +96,27 @@
   .space-layout.mobile-chat-open .chat-compose.expanded{border-radius:0 0 24px 24px}
   .space-layout.mobile-chat-open .chat-message-row .message-bubble{max-width:88%}
 }
+
+@media(max-width:760px){
+  .friend-list{padding-right:2px}
+  .friend-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:10px 9px;overflow:hidden}
+  .friend-main{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:10px;width:100%;min-width:0;padding:0;border:0;background:transparent;text-align:left}
+  .friend-main span,
+  .friend-main span:last-child,
+  .friend-row>div{min-width:0;max-width:100%;text-align:left}
+  .friend-row strong{display:flex;align-items:baseline;gap:6px;min-width:0;max-width:100%;font-size:.94rem;line-height:1.22;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .friend-row strong .friend-public-id{flex-shrink:0;margin-left:0;font-size:.73rem}
+  .friend-row small{display:block;max-width:100%;font-size:.78rem;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .friend-avatar-wrap{width:44px;height:44px}
+  .friend-avatar.image{width:44px;height:44px}
+  .friend-row>svg{justify-self:end;flex-shrink:0;color:#6c8887}
+  .unread-badge{justify-self:end}
+}
+
+@media(max-width:390px){
+  .friend-row{grid-template-columns:minmax(0,1fr) 24px}
+  .friend-main{grid-template-columns:40px minmax(0,1fr)}
+  .friend-avatar-wrap,.friend-avatar.image{width:40px;height:40px}
+  .friend-row strong{font-size:.9rem}
+  .friend-row small{font-size:.74rem}
+}
