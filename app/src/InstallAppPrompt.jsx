@@ -2,11 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { DownloadSimple, X } from '@phosphor-icons/react';
 import { IconButton } from './shared.jsx';
 
-const dismissedKey = 'miuzig.install.dismissed';
-
 export function InstallAppPrompt() {
   const [installEvent, setInstallEvent] = useState(null);
-  const [dismissed, setDismissed] = useState(() => localStorage.getItem(dismissedKey) === '1');
+  const [collapsed, setCollapsed] = useState(false);
   const [standalone, setStandalone] = useState(false);
 
   const isIos = useMemo(() => /iphone|ipad|ipod/i.test(navigator.userAgent || ''), []);
@@ -18,12 +16,11 @@ export function InstallAppPrompt() {
     const onBeforeInstallPrompt = event => {
       event.preventDefault();
       setInstallEvent(event);
-      setDismissed(localStorage.getItem(dismissedKey) === '1');
     };
     const onInstalled = () => {
       setStandalone(true);
       setInstallEvent(null);
-      localStorage.setItem(dismissedKey, '1');
+      setCollapsed(false);
     };
     updateStandalone();
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
@@ -34,7 +31,7 @@ export function InstallAppPrompt() {
     };
   }, []);
 
-  if (standalone || dismissed || (!installEvent && !isIos)) return null;
+  if (standalone || (!installEvent && !isIos)) return null;
 
   async function install() {
     if (!installEvent) return;
@@ -43,9 +40,11 @@ export function InstallAppPrompt() {
     setInstallEvent(null);
   }
 
-  function close() {
-    localStorage.setItem(dismissedKey, '1');
-    setDismissed(true);
+  if (collapsed) {
+    return <button type="button" className="install-app-dock" onClick={() => setCollapsed(false)} aria-label="Mở hướng dẫn cài MIUZIG">
+      <DownloadSimple size={19} />
+      <span>Cài app</span>
+    </button>;
   }
 
   return <aside className="install-app-prompt" aria-label="Cài MIUZIG">
@@ -54,6 +53,6 @@ export function InstallAppPrompt() {
       <span>{isIos && !installEvent ? 'iPhone: bấm Chia sẻ → Thêm vào Màn hình chính.' : 'Mở nhanh như app, dùng camera để chụp kỷ niệm.'}</span>
     </div>
     {installEvent && <button type="button" className="button primary" onClick={install}><DownloadSimple size={17} /> Cài app</button>}
-    <IconButton icon={X} label="Ẩn gợi ý cài app" onClick={close} />
+    <IconButton icon={X} label="Thu gọn gợi ý cài app" onClick={() => setCollapsed(true)} />
   </aside>;
 }
