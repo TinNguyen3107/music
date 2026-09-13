@@ -57,6 +57,20 @@ export function App() {
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(''), 4500); return () => clearTimeout(timer); }, [toast]);
   useEffect(() => { if (catalog && !current) { shouldPlay.current = false; setCurrentId(allCatalogTracks[0]?.id || null); } }, [catalog, current, allCatalogTracks.length]);
   useEffect(() => { audio.current.volume = volume; try { localStorage.setItem('melodik.volume', JSON.stringify(volume)); } catch {} }, [volume]);
+  // Stop audio when current track becomes null (e.g., track was deleted)
+  useEffect(() => {
+    if (!current && audio.current) {
+      audio.current.pause();
+      shouldPlay.current = false;
+      setPlaying(false);
+    }
+  }, [current]);
+  // Set initial volume on mount
+  useEffect(() => {
+    if (audio.current) {
+      audio.current.volume = volume;
+    }
+  }, []);
   useEffect(() => { setElapsed(0); setDuration(0); if (current && shouldPlay.current) audio.current.play().catch(() => notify('Chạm nút phát để bắt đầu nghe nhạc.')); }, [current?.audio, notify]);
 
   function navigate(path) { if (path === route) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; } history.pushState({}, '', path); setRoute(path); window.scrollTo(0, 0); }

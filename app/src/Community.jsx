@@ -203,6 +203,14 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
   useEffect(() => {
     cameraStreamRef.current = cameraStream;
     if (cameraVideoRef.current && cameraStream) cameraVideoRef.current.srcObject = cameraStream;
+
+    // Cleanup function to stop camera tracks when component unmounts or stream changes
+    return () => {
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(track => track.stop());
+        cameraStreamRef.current = null;
+      }
+    };
   }, [cameraStream]);
   useEffect(() => {
     const query = window.matchMedia('(max-width: 760px)');
