@@ -7,3 +7,46 @@
 .camera-modal{width:min(640px,calc(100% - 28px))}.camera-stage{position:relative;overflow:hidden;border:1px solid #bde5df;border-radius:20px;background:linear-gradient(145deg,#e9fbf8,#fff);aspect-ratio:4/3;display:grid;place-items:center}.camera-stage video,.camera-stage img{width:100%;height:100%;object-fit:cover;display:block}.camera-placeholder{position:absolute;inset:0;display:grid;place-items:center;align-content:center;gap:10px;color:#55706f;text-align:center;padding:24px}.camera-placeholder svg{color:#0f9488}.camera-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:12px 0 4px}.install-app-prompt{position:fixed;left:24px;bottom:24px;z-index:35;width:min(390px,calc(100% - 48px));display:flex;align-items:center;gap:12px;padding:13px 14px;background:#fffffff2;border:1px solid #bde5df;border-radius:18px;box-shadow:0 16px 40px #174b4f20;backdrop-filter:blur(12px)}.install-app-prompt>div{flex:1;min-width:0}.install-app-prompt strong{display:block;color:#143f42;font-size:.9rem}.install-app-prompt span{display:block;margin-top:3px;color:#5d7779;font-size:.76rem;line-height:1.4}.install-app-prompt .button{padding:9px 12px;white-space:nowrap}.install-app-prompt .icon-button{width:30px;height:30px;flex-shrink:0}.install-app-dock{position:fixed;left:24px;bottom:24px;z-index:35;display:inline-flex;align-items:center;gap:8px;border:1px solid #bde5df;border-radius:999px;background:#fffffff2;color:#087168;padding:10px 14px;font-weight:900;box-shadow:0 12px 28px #174b4f20;backdrop-filter:blur(12px)}.install-app-dock:hover{background:#e8f7f5;transform:translateY(-1px)}@media(max-width:760px){.camera-modal{max-height:calc(100dvh - 22px);padding:20px}.install-app-prompt{left:12px;right:12px;bottom:12px;width:auto;padding:12px}.install-app-prompt .button{font-size:.76rem}.install-app-prompt strong{font-size:.84rem}.install-app-prompt span{font-size:.72rem}.install-app-dock{left:12px;bottom:12px}}
 
 .camera-form{display:grid;gap:14px}.camera-capture-panel,.camera-details-panel{display:grid;gap:14px}.camera-small-preview{display:none;align-items:center;gap:10px;width:100%;padding:10px;border:1px solid #cbe5e1;border-radius:14px;background:#f6fcfb;color:#163d40;text-align:left}.camera-small-preview img{width:58px;height:58px;object-fit:cover;border-radius:11px}.camera-small-preview span{font-weight:900}.camera-back{justify-self:start;margin-bottom:-2px}@media(max-width:760px){.camera-mobile-flow{inset:0;width:100%;height:100dvh;max-height:none;border:0;border-radius:0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));background:#f7fcfb}.camera-mobile-flow::backdrop{background:#f7fcfb}.camera-mobile-flow .modal-header{margin-bottom:14px}.camera-mobile-flow .modal-header h2{font-size:1.55rem}.camera-mobile-flow.camera-step-capture .camera-form,.camera-mobile-flow.camera-step-review .camera-form{height:calc(100dvh - 88px);grid-template-rows:minmax(0,1fr) auto}.camera-mobile-flow.camera-step-capture .camera-capture-panel,.camera-mobile-flow.camera-step-review .camera-capture-panel{min-height:0}.camera-mobile-flow.camera-step-capture .camera-stage,.camera-mobile-flow.camera-step-review .camera-stage{height:100%;aspect-ratio:auto;border-radius:28px;background:#143f42;box-shadow:0 16px 38px #174b4f24}.camera-mobile-flow .camera-stage video,.camera-mobile-flow .camera-stage img{object-fit:cover}.camera-mobile-flow.camera-step-review .camera-stage img{object-fit:contain;background:#143f42}.camera-mobile-flow.camera-step-capture .camera-actions,.camera-mobile-flow.camera-step-review .camera-actions{position:sticky;bottom:0;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0;padding:12px;background:#f7fcfbee;border:1px solid #cbe5e1;border-radius:22px;box-shadow:0 14px 30px #174b4f17;backdrop-filter:blur(12px)}.camera-mobile-flow.camera-step-review .camera-actions{grid-template-columns:1fr 1.2fr}.camera-mobile-flow .camera-actions .button{min-height:52px;border-radius:16px;font-size:.94rem}.camera-mobile-flow.camera-step-details{height:min(100dvh,100%);overflow:auto}.camera-mobile-flow.camera-step-details .camera-capture-panel{display:none}.camera-mobile-flow.camera-step-details .camera-small-preview{display:flex}.camera-mobile-flow.camera-step-details .camera-details-panel{padding-bottom:16px}.camera-mobile-flow.camera-step-details .editor-form label{font-size:.94rem}.camera-mobile-flow.camera-step-details .editor-form input,.camera-mobile-flow.camera-step-details .editor-form select,.camera-mobile-flow.camera-step-details .editor-form textarea{font-size:1rem;min-height:50px}.camera-mobile-flow.camera-step-details .button.wide{min-height:52px;border-radius:16px}}
+
+@media(max-width:760px){
+  .your-space{margin-top:14px}
+  .profile-hero{grid-template-columns:72px minmax(0,1fr);gap:12px;padding:18px;border-radius:28px;align-items:center}
+  .profile-avatar-button{grid-row:1 / 3;align-self:start}
+  .profile-avatar-button img{width:72px;height:72px;border-radius:24px;box-shadow:0 10px 24px #174b4f18}
+  .profile-hero .eyebrow{font-size:.66rem;letter-spacing:.14em}
+  .profile-hero h1{font-size:2rem;line-height:1;margin:3px 0 7px}
+  .profile-hero p{font-size:.86rem;line-height:1.35;overflow-wrap:anywhere}
+  .profile-hero-bio{grid-column:1 / -1;font-size:.88rem!important;margin-top:4px!important}
+  .profile-hero>.button{grid-column:1 / -1;width:100%;min-height:48px;border-radius:16px;justify-content:center;font-size:.95rem}
+  .community-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 22px}
+  .community-actions .button{min-height:54px;border-radius:18px;padding:12px 10px;font-size:.95rem;justify-content:center;box-shadow:0 8px 18px #174b4f0f}
+  .community-actions .button:nth-child(3){grid-column:1 / -1;width:100%}
+  .space-layout{gap:16px;margin-top:6px}
+  .social-sidebar,.chat-workspace,.posts-sidebar .community-card{border-radius:26px;box-shadow:0 10px 24px #174b4f0e}
+  .social-sidebar{padding:14px;min-height:auto}
+  .friend-search{grid-template-columns:minmax(0,1fr)54px;gap:10px;margin-bottom:12px}
+  .friend-search input{min-height:54px;border-radius:17px}
+  .friend-search .button{min-height:54px;border-radius:17px;padding:0}
+  .friend-row{padding:11px 10px;border-radius:16px}
+  .friend-avatar.image{width:44px;height:44px}
+  .friend-row strong{font-size:.94rem}
+  .friend-row small{font-size:.78rem}
+  .chat-workspace{min-height:420px}
+  .chat-header{padding:14px;border-radius:26px 26px 0 0}
+  .chat-log.expanded{min-height:280px;max-height:52dvh;padding:14px}
+  .chat-compose.expanded{grid-template-columns:40px minmax(0,1fr)50px;padding:12px;border-radius:0 0 26px 26px}
+  .posts-sidebar{gap:16px}
+  .posts-sidebar .community-card{padding:18px}
+  .mini-post img{width:50px;height:50px;border-radius:14px}
+  .empty-state.compact{min-height:230px;margin:0;border-radius:22px}
+}
+
+@media(max-width:430px){
+  .profile-hero{grid-template-columns:68px minmax(0,1fr);padding:16px}
+  .profile-avatar-button img{width:68px;height:68px}
+  .profile-hero h1{font-size:1.75rem}
+  .profile-hero .eyebrow{font-size:.6rem}
+  .profile-hero p{font-size:.78rem}
+  .community-actions .button{font-size:.86rem}
+  .friend-search input{font-size:.95rem}
+}
