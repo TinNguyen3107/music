@@ -156,6 +156,7 @@ export function Admin({ notify }) {
                 <th>Email</th>
                 <th>Ngày tạo</th>
                 <th>Hoạt động</th>
+                <th>ID Công khai</th>
                 <th>Nội dung</th>
                 <th>Bạn bè</th>
               </tr>
@@ -176,6 +177,7 @@ export function Admin({ notify }) {
                   <td>{user.email}</td>
                   <td>{formatDate(user.createdAt)}</td>
                   <td><span className={`admin-status ${activity.online ? 'online' : ''}`}>{activity.text}</span></td>
+                  <td>{user.publicId || '#0000'}</td>
                   <td>{Number(user.trackCount || 0)} bài · {Number(user.photoCount || 0)} kỷ niệm</td>
                   <td>{Number(user.friendCount || 0)}</td>
                 </tr>;
