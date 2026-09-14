@@ -178,8 +178,8 @@ export function Admin({ notify }) {
                   <td>{formatDate(user.createdAt)}</td>
                   <td><span className={`admin-status ${activity.online ? 'online' : ''}`}>{activity.text}</span></td>
                   <td>{user.publicId || '#0000'}</td>
-                  <td>{Number(user.trackCount || 0)} bài · {Number(user.photoCount || 0)} kỷ niệm</td>
-                  <td>{Number(user.friendCount || 0)}</td>
+                  <td>{Number(user.trackcount || user.trackCount || 0)} bài · {Number(user.photocount || user.photoCount || 0)} kỷ niệm</td>
+                  <td>{Number(user.friendcount || user.friendCount || 0)}</td>
                 </tr>;
               })}
             </tbody>
