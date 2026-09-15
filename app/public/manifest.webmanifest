@@ -4,7 +4,7 @@
   "description": "Một góc nhỏ để nghe nhạc, lưu kỷ niệm và trò chuyện cùng bạn bè.",
   "start_url": "/music",
   "scope": "/",
-  "display": "standalone",
+  "display": "browser",
   "background_color": "#f3fbfa",
   "theme_color": "#0f9488",
   "orientation": "portrait",

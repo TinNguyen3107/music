@@ -120,3 +120,23 @@
   .friend-row strong{font-size:.9rem}
   .friend-row small{font-size:.74rem}
 }
+
+.chat-header{min-width:0}
+.chat-header>div{min-width:0;overflow:hidden}
+.chat-header strong,.chat-header span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-header .icon-button{flex-shrink:0}
+.chat-log.expanded{scroll-behavior:smooth;-webkit-overflow-scrolling:touch;overflow-anchor:none}
+.chat-message-row .message-bubble{min-width:0;overflow-wrap:anywhere;word-break:break-word}
+.chat-message-row .message-bubble p{white-space:pre-wrap}
+.chat-image-button,.message-bubble a{max-width:100%;overflow-wrap:anywhere}
+.friend-main>span:last-child{min-width:0;overflow:hidden}
+.friend-row .button.secondary{flex-shrink:0;max-width:74px;padding-inline:10px}
+.compose-chip>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+@media(max-width:760px){
+  .space-layout.mobile-chat-open .chat-header{display:grid;grid-template-columns:46px minmax(0,1fr) 42px 42px;gap:9px}
+  .space-layout.mobile-chat-open .chat-header .chat-avatar-wrap{width:46px;height:46px}
+  .space-layout.mobile-chat-open .chat-header .icon-button{width:42px;min-width:42px;height:42px}
+  .space-layout.mobile-chat-open .chat-log.expanded{touch-action:pan-y}
+  .space-layout.mobile-chat-open .chat-message-row .message-bubble{max-width:min(88%,520px)}
+}

@@ -152,7 +152,7 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
   const [search, setSearch] = useState(''), [results, setResults] = useState([]), [replyTo, setReplyTo] = useState(null), [attachmentFile, setAttachmentFile] = useState(null);
   const [genreDraft, setGenreDraft] = useState(''), [categoryDraft, setCategoryDraft] = useState('');
   const [cameraFacing, setCameraFacing] = useState('environment'), [cameraStream, setCameraStream] = useState(null), [cameraPhoto, setCameraPhoto] = useState(null), [cameraPreview, setCameraPreview] = useState(''), [cameraStep, setCameraStep] = useState('capture'), [isMobileCamera, setIsMobileCamera] = useState(false);
-  const [registerId, setRegisterId] = useState(randomPublicId), fileRef = useRef(null), chatLogRef = useRef(null), cameraVideoRef = useRef(null), cameraCanvasRef = useRef(null), cameraStreamRef = useRef(null);
+  const [registerId, setRegisterId] = useState(randomPublicId), fileRef = useRef(null), chatLogRef = useRef(null), cameraVideoRef = useRef(null), cameraCanvasRef = useRef(null), cameraStreamRef = useRef(null), shouldStickToBottomRef = useRef(true), forceScrollToBottomRef = useRef(false);
   const myTracks = useMemo(() => (catalog.communityTracks || []).filter(track => track.userId === me?.id), [catalog.communityTracks, me?.id]);
   const myPhotos = useMemo(() => (catalog.communityPhotos || []).filter(photo => photo.userId === me?.id), [catalog.communityPhotos, me?.id]);
   const genreSuggestions = useMemo(() => [...new Set(myTracks.map(track => track.genre).filter(Boolean))], [myTracks]);
@@ -168,6 +168,7 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
   }
   async function loadChat(friend = selectedFriend) {
     if (!friend) return;
+    shouldStickToBottomRef.current = isChatNearBottom();
     setChat(await api(`/api/chat/${friend.id}`));
     setFriends(old => old.map(item => item.id === friend.id ? { ...item, unreadCount: 0 } : item));
   }
@@ -197,6 +198,7 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
   }, []);
   useEffect(() => {
     if (!selectedFriend) return;
+    forceScrollToBottomRef.current = true;
     loadChat(selectedFriend).catch(e => setError(e.message));
     const timer = setInterval(() => loadChat(selectedFriend).catch(() => {}), 2000);
     return () => clearInterval(timer);
@@ -236,7 +238,15 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     setPrevFriends([...friends]);
     setPrevChatLength(chat.length);
   }, [friends, chat, me, selectedFriend, notify]);
-  useEffect(() => { if (chatLogRef.current) chatLogRef.current.scrollTop = chatLogRef.current.scrollHeight; }, [chat]);
+  useEffect(() => {
+    const log = chatLogRef.current;
+    if (!log) return;
+    if (!forceScrollToBottomRef.current && !shouldStickToBottomRef.current) return;
+    requestAnimationFrame(() => {
+      log.scrollTop = log.scrollHeight;
+      forceScrollToBottomRef.current = false;
+    });
+  }, [chat]);
   useEffect(() => {
     cameraStreamRef.current = cameraStream;
     if (cameraVideoRef.current && cameraStream) cameraVideoRef.current.srcObject = cameraStream;
@@ -413,6 +423,7 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
       if (file?.size) form.set('attachmentName', file.name);
       if (replyTo) form.set('replyTo', replyTo.id);
       await api(`/api/chat/${selectedFriend.id}`, { method: 'POST', body: await uploadFiles(form, storage, [['attachment', 'chat']]) });
+      forceScrollToBottomRef.current = true;
       formEl.reset(); setReplyTo(null); setAttachmentFile(null); await loadChat(selectedFriend);
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   }
@@ -426,6 +437,11 @@ export function Community({ catalog, refresh, notify, me: appUser, onUserChange,
     )
   );
   const shortText = value => value && value.length > 35 ? `${value.slice(0, 35)}…` : value;
+  function isChatNearBottom() {
+    const log = chatLogRef.current;
+    if (!log) return true;
+    return log.scrollHeight - log.scrollTop - log.clientHeight < 96;
+  }
   function jumpToMessage(id) {
     const node = document.getElementById(`chat-message-${id}`);
     if (!node) return;

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowUpRight, CaretDown, CircleNotch, Heart, MusicNotes, NotePencil, Pause, Play, SkipBack, SkipForward, Sparkle, X } from '@phosphor-icons/react';
 import { Admin } from './Admin.jsx';
-import { InstallAppPrompt } from './InstallAppPrompt.jsx';
 import { Music } from './Music.jsx';
 import { Gallery, Guestbook } from './Pages.jsx';
 import { Community } from './Community.jsx';
@@ -115,7 +114,6 @@ export function App() {
     </main>
     <footer className="site-footer"><div><a className="wordmark small" href="/" onClick={e => { e.preventDefault(); navigate('/'); }}>MIUZIG</a><p>Một chút nhạc. Một chút bình yên.</p></div><span className="footer-note">Made for slow days <Heart size={14} /></span><a href="/admin" onClick={e => { e.preventDefault(); navigate('/admin'); }}>Quản trị <ArrowUpRight size={14} /></a></footer>
     {!['/', '/music'].includes(route) && current && (miniPlayerCollapsed ? <button className="mini-player-dock" aria-label="Mở trình phát nhạc" onClick={() => setMiniPlayerCollapsed(false)}><MusicNotes size={21} /></button> : <div className="mini-player"><img src={currentCover || current.cover} alt="" /><div className="mini-title"><strong>{current.title}</strong><span>{current.artist || current.owner}</span></div><div className="mini-controls"><IconButton icon={SkipBack} label="Bài trước" onClick={() => skip(-1)} /><IconButton className="primary" icon={playing ? Pause : Play} label={playing ? 'Tạm dừng' : 'Phát nhạc'} onClick={toggle} /><IconButton icon={SkipForward} label="Bài tiếp theo" onClick={() => skip(1)} /></div><input aria-label="Tiến trình phát nhạc" type="range" min="0" max={duration || current.duration} value={Math.min(elapsed, duration || current.duration)} step=".1" onChange={e => seek(e.target.value)} /><span className="mono">{time(elapsed)}</span><button className="mini-return" onClick={() => navigate('/music')}>Góc nhạc <ArrowUpRight size={16} /></button><IconButton className="mini-collapse" icon={CaretDown} label="Thu gọn trình phát" onClick={() => setMiniPlayerCollapsed(true)} /></div>)}
-    {!isAdmin && <InstallAppPrompt />}
     {toast && <div role="status" className="toast show">{toast}<IconButton icon={X} label="Đóng thông báo" onClick={() => setToast('')} /></div>}
   </>;
 }
