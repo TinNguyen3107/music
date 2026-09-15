@@ -121,6 +121,17 @@
   .friend-row small{font-size:.74rem}
 }
 
+.social-sidebar,.friend-list,.search-results{min-width:0;max-width:100%;overflow-x:hidden;box-sizing:border-box}
+.friend-row{width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden}
+.friend-main{min-width:0;max-width:100%;box-sizing:border-box;overflow:hidden;border:0;background:transparent;padding:0}
+.friend-main .friend-avatar-wrap{flex:0 0 auto}
+.friend-main>span:last-child{flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden}
+.friend-row strong{min-width:0;max-width:100%}
+.friend-row .friend-public-id{flex:0 0 auto}
+.friend-row>svg,.friend-row .unread-badge,.friend-row .inline-actions{flex:0 0 auto}
+.search-results .friend-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto}
+.search-results .friend-row>div{min-width:0;overflow:hidden}
+
 .chat-header{min-width:0}
 .chat-header>div{min-width:0;overflow:hidden}
 .chat-header strong,.chat-header span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
