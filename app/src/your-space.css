@@ -122,7 +122,7 @@
 }
 
 .social-sidebar,.friend-list,.search-results{min-width:0;max-width:100%;overflow-x:hidden;box-sizing:border-box}
-.friend-row{width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:hidden}
+.friend-row{position:relative;width:100%;max-width:100%;min-width:0;box-sizing:border-box;overflow:visible}
 .friend-main{min-width:0;max-width:100%;box-sizing:border-box;overflow:hidden;border:0;background:transparent;padding:0}
 .friend-main .friend-avatar-wrap{flex:0 0 auto}
 .friend-main>span:last-child{flex:1 1 auto;min-width:0;max-width:100%;overflow:hidden}
@@ -131,6 +131,9 @@
 .friend-row>svg,.friend-row .unread-badge,.friend-row .inline-actions{flex:0 0 auto}
 .search-results .friend-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto}
 .search-results .friend-row>div{min-width:0;overflow:hidden}
+.friend-list .friend-row small{cursor:help}
+.friend-list .friend-row:hover small{position:absolute;left:54px;right:10px;top:43px;z-index:6;padding:7px 9px;border:1px solid #bde5df;border-radius:10px;background:#fff;color:#405c5b;box-shadow:0 10px 24px #174b4f1f;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35}
+.friend-list .friend-row:hover{z-index:7}
 
 .chat-header{min-width:0}
 .chat-header>div{min-width:0;overflow:hidden}
