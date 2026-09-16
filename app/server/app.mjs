@@ -192,6 +192,25 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   app.post('/api/users/logout', async (req, res) => { await query('DELETE FROM user_sessions WHERE token=?', [digest(userTokenFrom(req))]); res.clearCookie('melodik_user', { path: '/' }); res.json({ ok: true }); });
   app.post('/api/messages', async (req, res) => { await limit(`message:${req.ip}`, 5); await query('INSERT INTO messages (id,name,email,message,createdAt) VALUES (?,?,?,?,?)', [makeId(), text(req.body.name, 80), email(req.body.email), text(req.body.message, 3000), new Date().toISOString()]); res.status(201).json({ ok: true }); });
   app.get('/api/admin/users', auth, async (_req, res) => res.json(await all(`SELECT users.id,users.name,users.email,users.publicId,users.avatar,users.bio,users.lastActiveAt,users.createdAt,(SELECT COUNT(*) FROM community_tracks WHERE community_tracks.userId=users.id) AS trackCount,(SELECT COUNT(*) FROM community_photos WHERE community_photos.userId=users.id) AS photoCount,(SELECT COUNT(*) FROM friendships WHERE (friendships.userId=users.id OR friendships.friendId=users.id) AND friendships.status='accepted') AS friendCount FROM users ORDER BY users.createdAt DESC`)));
+  app.get('/api/admin/users/:id/tracks', auth, async (req, res) => {
+    const { id } = req.params;
+    // Ensure the logged-in admin is requesting data for a valid user
+    const userExists = await row('SELECT id FROM users WHERE id=?', [id]);
+    if (!userExists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const tracks = await all('SELECT community_tracks.*,users.name AS owner,users.publicId AS ownerPublicId,users.avatar AS ownerAvatar FROM community_tracks JOIN users ON users.id=community_tracks.userId WHERE community_tracks.userId=? ORDER BY community_tracks.createdAt DESC', [id]);
+    res.json(tracks);
+  });
+  app.get('/api/admin/users/:id/photos', auth, async (req, res) => {
+    const { id } = req.params;
+    const userExists = await row('SELECT id FROM users WHERE id=?', [id]);
+    if (!userExists) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const photos = await all('SELECT community_photos.*,users.name AS owner,users.publicId AS ownerPublicId,users.avatar AS ownerAvatar FROM community_photos JOIN users ON users.id=community_photos.userId WHERE community_photos.userId=? ORDER BY community_photos.date DESC', [id]);
+    res.json(photos);
+  });
   app.get('/api/admin/messages', auth, async (_req, res) => res.json(await all('SELECT * FROM messages ORDER BY createdAt DESC')));
   app.post('/api/admin/upload-token', async (req, res) => {
     if (!production) throw fail('Chức năng này chỉ dùng khi đã triển khai.', 404);
@@ -280,7 +299,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   });
   app.post('/api/friends/:id/accept', authUser, async (req, res) => { const invite = await row("SELECT userId FROM friendships WHERE userId=? AND friendId=? AND status='pending'", [req.params.id, req.user.id]); if (!invite) throw fail('Không có lời mời phù hợp.', 404); await query("UPDATE friendships SET status='accepted' WHERE userId=? AND friendId=?", [req.params.id, req.user.id]); res.json({ ok: true }); });
   app.post('/api/friends/:id/reject', authUser, async (req, res) => { await query("DELETE FROM friendships WHERE userId=? AND friendId=? AND status='pending'", [req.params.id, req.user.id]); res.json({ ok: true }); });
-  app.get('/api/chat/:id', authUser, async (req, res) => { if (!await areFriends(req.user.id, req.params.id)) throw fail('B�n ch� c� th� tr� chuy�n v�i b�n b�.', 403); const rows = await all('SELECT c.*, r.attachment AS replyAttachment, r.message AS replyMessage, r.attachmentName AS replyAttachmentName, r.senderId AS replySenderId FROM chat_messages c LEFT JOIN chat_messages r ON c.replyTo = r.id WHERE (c.senderId=? AND c.recipientId=?) OR (c.senderId=? AND c.recipientId=?) ORDER BY c.createdAt ASC LIMIT 200', [req.user.id, req.params.id, req.params.id, req.user.id]); await query('INSERT INTO chat_reads (userId,friendId,readAt) VALUES (?,?,?) ON CONFLICT(userId,friendId) DO UPDATE SET readAt=excluded.readAt', [req.user.id, req.params.id, new Date().toISOString()]); res.json(rows); });
+  app.get('/api/chat/:id', authUser, async (req, res) => { if (!await areFriends(req.user.id, req.params.id)) throw fail('B�n ch� c� th� tr� chuy�n v�i b�n b�.', 403); const rows = await all('SELECT c.*, r.attachment AS replyAttachment, r.message AS replyMessage, r.attachmentName AS replyAttachmentName, r.senderId AS replySenderId FROM chat_messages c LEFT JOIN chat_messages r ON c.replyTo = r.id WHERE (c.senderId=? AND c.recipientId=?) OR (c.senderId=? AND c.recipientId=?) ORDER BY c.createdAt ASC LIMIT 200', [req.user.id, req.params.id, req.params.id, req.user.id]); await query('INSERT INTO chat_reads (userId,friendId,readAt) VALUES (?,?,?) ON CONFLICT(userId,friendId) DO UPDATE SET readAt=excluded.readAt', [req.user.id, req.params.id, new Date().toISOString()]); res.json(rows); });
   async function saveChatMessage(req, res) {
     if (!await areFriends(req.user.id, req.params.id)) throw fail('Bạn chỉ có thể trò chuyện với bạn bè.', 403);
     const message = text(req.body.message || '', 2000, false);

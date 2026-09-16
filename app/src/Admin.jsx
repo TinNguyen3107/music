@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, SignOut, UserCircle, UsersThree } from '@phosphor-icons/react';
-import { api } from './shared.jsx';
+import { api, Modal } from './shared.jsx';
 
 const activeWindowMs = 60 * 1000;
 
@@ -41,6 +41,10 @@ export function Admin({ notify }) {
   const [busy, setBusy] = useState(false);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [query, setQuery] = useState('');
+  const [modalType, setModalType] = useState(null);
+  const [modalUser, setModalUser] = useState(null);
+  const [modalData, setModalData] = useState([]);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const check = () => api('/api/auth/me').then(setAuth).catch(error => setAuthError(error.message));
 
@@ -120,76 +124,194 @@ export function Admin({ notify }) {
     </form>
   </section>;
 
-  return <>
-    <div className="admin-heading">
-      <div>
-        <div className="eyebrow">MIUZIG STUDIO</div>
-        <h1>Quản lý người dùng.</h1>
-      </div>
-      <button className="button secondary" onClick={logout}><SignOut size={18} /> Đăng xuất</button>
-    </div>
+  const renderModal = () => {
+    if (!modalType) return null;
 
-    <div className="admin-users-dashboard">
-      <section className="admin-stats">
-        <StatCard icon={UsersThree} label="Tài khoản đã tạo" value={stats.total} note="Tổng số thành viên" />
-        <StatCard icon={Clock} label="Đang hoạt động" value={stats.online} note="Trong khoảng 1 phút gần đây" />
-        <StatCard icon={CalendarBlank} label="Tạo hôm nay" value={stats.today} note={new Date().toLocaleDateString('vi-VN')} />
-      </section>
+    return (
+      <Modal
+        title={modalType === 'tracks' ? 'Bài hát của ' + modalUser.name : 'Kỷ niệm của ' + modalUser.name}
+        onClose={() => {
+          setModalType(null);
+          setModalUser(null);
+          setModalData([]);
+        }}
+        className="admin-modal"
+      >
+        {modalLoading ? (
+          <div className="empty-state">
+            <CircleNotch className="spin" size={30} />
+          </div>
+        ) : (
+          modalData.length ? (
+            <div className="admin-modal-content">
+              {modalType === 'tracks' ? (
+                modalData.map(track => (
+                  <div key={track.id} className="admin-modal-item">
+                    <div className="admin-modal-item-info">
+                      <strong>{track.title}</strong> - {track.artist || 'N/A'}
+                      <br />
+                      <small>Thể loại: {track.genre}</small>
+                    </div>
+                    {track.cover && (
+                      <img
+                        src={track.cover}
+                        alt={track.title}
+                        className="admin-modal-item-cover"
+                      />
+                    )}
+                  </div>
+                ))
+              ) : (
+                modalData.map(photo => (
+                  <div key={photo.id} className="admin-modal-item">
+                    <div className="admin-modal-item-info">
+                      <strong>{photo.title}</strong>
+                      <br />
+                      <small>Danh mục: {photo.category}</small>
+                      <br />
+                      <small>Ngày: {new Date(photo.date).toLocaleDateString('vi-VN')}</small>
+                    </div>
+                    <img
+                      src={photo.image}
+                      alt={photo.title}
+                      className="admin-modal-item-image"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          ) : (
+            <p>Không có dữ liệu.</p>
+          )
+        )}
+      </Modal>
+    );
+  };
 
-      <section className="admin-panel admin-users-panel">
-        <div className="admin-toolbar">
-          <div>
-            <h2>Người dùng <span>{filteredUsers.length}</span></h2>
-            <p>Xem ai đã tạo tài khoản, tạo lúc nào và hoạt động gần nhất.</p>
-          </div>
-          <div className="admin-user-tools">
-            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm tên, email hoặc ID..." />
-            <button className="button secondary" onClick={loadUsers} disabled={loadingUsers}>{loadingUsers ? <CircleNotch className="spin" size={17} /> : 'Tải lại'}</button>
-          </div>
+  return (
+    <>
+      <div className="admin-heading">
+        <div>
+          <div className="eyebrow">MIUZIG STUDIO</div>
+          <h1>Quản lý người dùng.</h1>
         </div>
+        <button className="button secondary" onClick={logout}><SignOut size={18} /> Đăng xuất</button>
+      </div>
 
-        {loadingUsers && !users.length ? <div className="empty-state"><CircleNotch className="spin" size={30} /><p>Đang tải người dùng…</p></div> : filteredUsers.length ? <div className="admin-users-table-wrap">
-          <table className="admin-users-table">
-            <thead>
-              <tr>
-                <th>Người dùng</th>
-                <th>Email</th>
-                <th>Ngày tạo</th>
-                <th>Hoạt động</th>
-                <th>ID Công khai</th>
-                <th>Nội dung</th>
-                <th>Bạn bè</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map(user => {
-                const activity = activityText(user.lastActiveAt);
-                return <tr key={user.id}>
-                  <td>
-                    <span className="admin-user-cell">
-                      <img src={user.avatar || '/artwork/sleeve.webp'} alt="" />
-                      <span>
-                        <strong>{user.name}</strong>
-                        <small>{user.publicId || '#0000'}</small>
-                      </span>
-                    </span>
-                  </td>
-                  <td>{user.email}</td>
-                  <td>{formatDate(user.createdAt)}</td>
-                  <td><span className={`admin-status ${activity.online ? 'online' : ''}`}>{activity.text}</span></td>
-                  <td>{user.publicId || '#0000'}</td>
-                  <td>{Number(user.trackcount || user.trackCount || 0)} bài · {Number(user.photocount || user.photoCount || 0)} kỷ niệm</td>
-                  <td>{Number(user.friendcount || user.friendCount || 0)}</td>
-                </tr>;
-              })}
-            </tbody>
-          </table>
-        </div> : <div className="empty-state">
-          <UserCircle size={34} />
-          <h3>Chưa có người dùng phù hợp.</h3>
-          <p>{query ? 'Thử tìm bằng tên, email hoặc ID khác.' : 'Khi thành viên đăng ký, tài khoản sẽ xuất hiện ở đây.'}</p>
-        </div>}
-      </section>
-    </div>
-  </>;
+      <div className="admin-users-dashboard">
+        <section className="admin-stats">
+          <StatCard icon={UsersThree} label="Tài khoản đã tạo" value={stats.total} note="Tổng số thành viên" />
+          <StatCard icon={Clock} label="Đang hoạt động" value={stats.online} note="Trong khoảng 1 phút gần đây" />
+          <StatCard icon={CalendarBlank} label="Tạo hôm nay" value={stats.today} note={new Date().toLocaleDateString('vi-VN')} />
+        </section>
+
+        <section className="admin-panel admin-users-panel">
+          <div className="admin-toolbar">
+            <div>
+              <h2>Người dùng <span>{filteredUsers.length}</span></h2>
+              <p>Xem ai đã tạo tài khoản, tạo lúc nào và hoạt động gần nhất.</p>
+            </div>
+            <div className="admin-user-tools">
+              <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Tìm tên, email hoặc ID..." />
+              <button className="button secondary" onClick={loadUsers} disabled={loadingUsers}>{loadingUsers ? <CircleNotch className="spin" size={17} /> : 'Tải lại'}</button>
+            </div>
+          </div>
+
+          {loadingUsers && !users.length ? (
+            <div className="empty-state">
+              <CircleNotch className="spin" size={30} />
+              <p>Đang tải người dùng…</p>
+            </div>
+          ) : filteredUsers.length ? (
+            <div className="admin-users-table-wrap">
+              <table className="admin-users-table">
+                <thead>
+                  <tr>
+                    <th>Người dùng</th>
+                    <th>Email</th>
+                    <th>Ngày tạo</th>
+                    <th>Hoạt động</th>
+                    <th>ID Công khai</th>
+                    <th>Bài hát</th>
+                    <th>Kỷ niệm</th>
+                    <th>Bạn bè</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map(user => {
+                    const activity = activityText(user.lastActiveAt);
+                    return (
+                      <tr key={user.id}>
+                        <td>
+                          <span className="admin-user-cell">
+                            <img src={user.avatar || '/artwork/sleeve.webp'} alt="" />
+                            <span>
+                              <strong>{user.name}</strong>
+                              <small>{user.publicId || '#0000'}</small>
+                            </span>
+                          </span>
+                        </td>
+                        <td>{user.email}</td>
+                        <td>{formatDate(user.createdAt)}</td>
+                        <td>
+                          <span className={`admin-status ${activity.online ? 'online' : ''}`}>
+                            {activity.text}
+                          </span>
+                        </td>
+                        <td>{user.publicId || '#0000'}</td>
+                        <td
+                          onClick={() => {
+                            setModalType('tracks');
+                            setModalUser(user);
+                            setModalLoading(true);
+                            api(`/api/admin/users/${user.id}/tracks`)
+                              .then(data => {
+                                setModalData(data);
+                                setModalLoading(false);
+                              })
+                              .catch(err => {
+                                notify?.(err.message);
+                                setModalLoading(false);
+                              })
+                          }}
+                        >
+                          {Number(user.trackCount || 0)}
+                        </td>
+                        <td
+                          onClick={() => {
+                            setModalType('photos');
+                            setModalUser(user);
+                            setModalLoading(true);
+                            api(`/api/admin/users/${user.id}/photos`)
+                              .then(data => {
+                                setModalData(data);
+                                setModalLoading(false);
+                              })
+                              .catch(err => {
+                                notify?.(err.message);
+                                setModalLoading(false);
+                              });
+                          }}
+                        >
+                          {Number(user.photoCount || 0)}
+                        </td>
+                        <td>{Number(user.friendcount || user.friendCount || 0)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <UserCircle size={34} />
+              <h3>Chưa có người dùng phù hợp.</h3>
+              <p>{query ? 'Thử tìm bằng tên, email hoặc ID khác.' : 'Khi thành viên đăng ký, tài khoản sẽ xuất hiện ở đây.'}</p>
+            </div>
+          )}
+        </section>
+      </div>
+      {renderModal()}
+    </>
+  );
 }
