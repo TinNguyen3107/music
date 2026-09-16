@@ -262,8 +262,7 @@ export function Admin({ notify }) {
           </div>
         ) : (
           <form className="admin-form" onSubmit={handlePasswordChange}>
-            <label>
-              Mật khẩu hiện tại<input
+            <label className="password-field">Mật khẩu hiện tại<span className="password-input"><input
                 type={showPassword ? 'text' : 'password'}
                 name="currentPassword"
                 value={currentPassword}
@@ -280,11 +279,9 @@ export function Admin({ notify }) {
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}
-              </button>
-            </label>
+              </button></span></label>
             {passwordError && <p className="form-error" role="alert">{passwordError}</p>}
-            <label>
-              Mật khẩu mới<input
+            <label className="password-field">Mật khẩu mới<span className="password-input"><input
                 type={showPassword ? 'text' : 'password'}
                 name="newPassword"
                 value={newPassword}
@@ -301,10 +298,8 @@ export function Admin({ notify }) {
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}
-              </button>
-            </label>
-            <label>
-              Xác nhận mật khẩu mới<input
+              </button></span></label>
+            <label className="password-field">Xác nhận mật khẩu mới<span className="password-input"><input
                 type={showPassword ? 'text' : 'password'}
                 name="confirmPassword"
                 value={confirmPassword}
@@ -321,8 +316,7 @@ export function Admin({ notify }) {
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}
-              </button>
-            </label>
+              </button></span></label>
             {passwordSuccess && <p className="form-success" role="status">Đã đổi mật khẩu thành công!</p>}
             <button className="button primary wide" disabled={changingPassword}>
               {changingPassword ? <CircleNotch className="spin" size={18} /> : <LockKey size={18} />}
