@@ -212,6 +212,35 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     res.json(photos);
   });
   app.get('/api/admin/messages', auth, async (_req, res) => res.json(await all('SELECT * FROM messages ORDER BY createdAt DESC')));
+app.post('/api/auth/password', auth, async (req, res) => {
+  // Ensure the logged-in user is an admin
+  const admin = await row('SELECT * FROM admin WHERE id=?', [1]); // Assuming admin ID is 1
+  if (!admin) {
+    return res.status(401).json({ error: 'Admin not found' });
+  }
+
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current password and new password are required' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters long' });
+  }
+
+  // Verify current password
+  const hash = scryptSync(currentPassword, admin.salt || '', 64);
+  if (!timingSafeEqual(hash, Buffer.from(admin.passwordHash, 'hex'))) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+
+  // Update password
+  const salt = randomBytes(16).toString('hex');
+  const passwordHash = scryptSync(newPassword, salt, 64).toString('hex');
+  await query('UPDATE admin SET passwordHash=?, salt=? WHERE id=?', [passwordHash, salt, 1]);
+
+  res.json({ ok: true });
+});
   app.post('/api/admin/upload-token', async (req, res) => {
     if (!production) throw fail('Chức năng này chỉ dùng khi đã triển khai.', 404);
     if (req.body?.type === 'blob.generate-client-token' && !await session(req) && !await userSession(req)) {

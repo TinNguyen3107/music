@@ -45,6 +45,14 @@ export function Admin({ notify }) {
   const [modalUser, setModalUser] = useState(null);
   const [modalData, setModalData] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
+  // Password change modal state
+  const [changePasswordModal, setChangePasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   const check = () => api('/api/auth/me').then(setAuth).catch(error => setAuthError(error.message));
 
@@ -74,6 +82,49 @@ export function Admin({ notify }) {
       setAuthError(error.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function handlePasswordChange(event) {
+    event.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Mật khẩu mới và xác nhận mật khẩu không khớp');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('Mật khẩu mới phải có ít nhất 6 ký tự');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await api(`/api/auth/password`, {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      setPasswordSuccess(true);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+
+      // Auto-close modal after success
+      setTimeout(() => {
+        setChangePasswordModal(false);
+        setPasswordSuccess(false);
+      }, 1500);
+    } catch (error) {
+      setPasswordError(error.message || 'Đã xảy ra lỗi khi đổi mật khẩu');
+    } finally {
+      setChangingPassword(false);
     }
   }
 
@@ -188,6 +239,112 @@ export function Admin({ notify }) {
     );
   };
 
+  const renderPasswordChangeModal = () => {
+    if (!changePasswordModal) return null;
+
+    return (
+      <Modal
+        title="Đổi mật khẩu quản trị"
+        onClose={() => {
+          setChangePasswordModal(false);
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setPasswordError('');
+          setPasswordSuccess(false);
+        }}
+        className="admin-modal"
+      >
+        {changingPassword ? (
+          <div className="empty-state">
+            <CircleNotch className="spin" size={30} />
+            <p>Đang đổi mật khẩu...</p>
+          </div>
+        ) : (
+          <form className="admin-form" onSubmit={handlePasswordChange}>
+            <label>
+              Mật khẩu hiện tại<input
+                type={showPassword ? 'text' : 'password'}
+                name="currentPassword"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                required
+                minLength={6}
+                maxLength={128}
+                autoComplete="current-password"
+                placeholder="Nhập mật khẩu hiện tại"
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}
+              </button>
+            </label>
+            {passwordError && <p className="form-error" role="alert">{passwordError}</p>}
+            <label>
+              Mật khẩu mới<input
+                type={showPassword ? 'text' : 'password'}
+                name="newPassword"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                required
+                minLength={6}
+                maxLength={128}
+                autoComplete="new-password"
+                placeholder="Nhập mật khẩu mới (ít nhất 6 ký tự)"
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}
+              </button>
+            </label>
+            <label>
+              Xác nhận mật khẩu mới<input
+                type={showPassword ? 'text' : 'password'}
+                name="confirmPassword"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                required
+                minLength={6}
+                maxLength={128}
+                autoComplete="new-password"
+                placeholder="Nhập lại mật khẩu mới"
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}
+              </button>
+            </label>
+            {passwordSuccess && <p className="form-success" role="status">Đã đổi mật khẩu thành công!</p>}
+            <button className="button primary wide" disabled={changingPassword}>
+              {changingPassword ? <CircleNotch className="spin" size={18} /> : <LockKey size={18} />}
+              Đổi mật khẩu
+              <ArrowRight size={17} />
+            </button>
+            <button className="button secondary" onClick={() => {
+              setChangePasswordModal(false);
+              setCurrentPassword('');
+              setNewPassword('');
+              setConfirmPassword('');
+              setPasswordError('');
+              setPasswordSuccess(false);
+            }}>
+              Hủy
+            </button>
+          </form>
+        )}
+      </Modal>
+    );
+  };
+
   return (
     <>
       <div className="admin-heading">
@@ -195,7 +352,12 @@ export function Admin({ notify }) {
           <div className="eyebrow">MIUZIG STUDIO</div>
           <h1>Quản lý người dùng.</h1>
         </div>
-        <button className="button secondary" onClick={logout}><SignOut size={18} /> Đăng xuất</button>
+        <div>
+          <button className="button secondary" onClick={() => setChangePasswordModal(true)}>
+            <LockKey size={18} /> Đổi mật khẩu
+          </button>
+          <button className="button secondary" onClick={logout}><SignOut size={18} /> Đăng xuất</button>
+        </div>
       </div>
 
       <div className="admin-users-dashboard">
@@ -312,6 +474,7 @@ export function Admin({ notify }) {
         </section>
       </div>
       {renderModal()}
+{renderPasswordChangeModal()}
     </>
   );
 }
