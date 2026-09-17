@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, NotePencil, SignOut, UserCircle, UsersThree } from '@phosphor-icons/react';
+import { ArrowRight, ArrowUpRight, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, NotePencil, SignOut, Sparkle, UserCircle, UsersThree } from '@phosphor-icons/react';
 import { api, Modal } from './shared.jsx';
 
 const activeWindowMs = 60 * 1000;
@@ -33,7 +33,7 @@ function StatCard({ icon: Icon, label, value, note }) {
   </article>;
 }
 
-export function Admin({ notify }) {
+export function Admin({ notify, navigate }) {
   const [auth, setAuth] = useState(null);
   const [authError, setAuthError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -360,18 +360,7 @@ export function Admin({ notify }) {
 
   return (
     <>
-     <div className="admin-heading">
-       <div>
-         <div className="eyebrow">MIUZIG STUDIO</div>
-         <h1>Quản lý người dùng.</h1>
-       </div>
-       <div>
-         <button className="button secondary" onClick={() => setChangePasswordModal(true)}>
-           <LockKey size={18} /> Đổi mật khẩu
-         </button>
-         <button className="button secondary" onClick={logout}><SignOut size={18} /> Đăng xuất</button>
-       </div>
-     </div>
+     <header className="site-header"><div className="header-inner"><a className="wordmark" href="/" onClick={e => { e.preventDefault(); navigate('/'); }}>MIUZIG<span className="logo-star"><Sparkle size={18} weight="fill" /></span></a><nav aria-label="Điều hướng chính">{link('/music', 'Góc nghe nhạc')}{link('/gallery', 'Kỷ niệm')}{link('/community', 'Góc của bạn')}{link('/guestbook', 'Sổ lưu bút')}</nav><a className="hello-link profile-link" href="/community" onClick={e => { e.preventDefault(); navigate('/community'); }}>{auth ? <img src={auth.avatar || '/artwork/sleeve.webp'} alt="" /> : <NotePencil size={17} />}{auth ? <span>{auth.name}</span> : 'Admin'}<ArrowUpRight size={15} /></a></div></header>
  
      <div className="admin-tabs">
        <button 
