@@ -45,32 +45,49 @@ export function Admin({ notify }) {
   const [modalUser, setModalUser] = useState(null);
   const [modalData, setModalData] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
-  // Password change modal state
-  const [changePasswordModal, setChangePasswordModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
+ // Password change modal state
+ const [changePasswordModal, setChangePasswordModal] = useState(false);
+ const [currentPassword, setCurrentPassword] = useState('');
+ const [newPassword, setNewPassword] = useState('');
+ const [confirmPassword, setConfirmPassword] = useState('');
+ const [changingPassword, setChangingPassword] = useState(false);
+ const [passwordError, setPasswordError] = useState('');
+ const [passwordSuccess, setPasswordSuccess] = useState(false);
+ // Messages tab state
+ const [activeTab, setActiveTab] = useState('users');
+ const [messages, setMessages] = useState([]);
+ const [loadingMessages, setLoadingMessages] = useState(false);
 
-  const check = () => api('/api/auth/me').then(setAuth).catch(error => setAuthError(error.message));
+ const check = () => api('/api/auth/me').then(setAuth).catch(error => setAuthError(error.message));
 
-  async function loadUsers() {
-    setLoadingUsers(true);
-    try {
-      setUsers(await api('/api/admin/users'));
-    } catch (error) {
-      notify?.(error.message);
-    } finally {
-      setLoadingUsers(false);
-    }
-  }
+ async function loadUsers() {
+   setLoadingUsers(true);
+   try {
+     setUsers(await api('/api/admin/users'));
+   } catch (error) {
+     notify?.(error.message);
+   } finally {
+     setLoadingUsers(false);
+   }
+ }
 
-  useEffect(() => { check(); }, []);
-  useEffect(() => { if (auth?.authenticated) loadUsers(); }, [auth?.authenticated]);
+ async function loadMessages() {
+   setLoadingMessages(true);
+   try {
+     const data = await api('/api/admin/messages');
+     setMessages(data);
+   } catch (error) {
+     notify?.(error.message);
+   } finally {
+     setLoadingMessages(false);
+   }
+ }
 
-  async function signIn(event) {
+ useEffect(() => { check(); }, []);
+ useEffect(() => { if (auth?.authenticated) loadUsers(); }, [auth?.authenticated]);
+ useEffect(() => { if (auth?.authenticated) loadMessages(); }, [auth?.authenticated]);
+
+ async function signIn(event) {
     event.preventDefault();
     setBusy(true);
     setAuthError('');
@@ -151,9 +168,11 @@ export function Admin({ notify }) {
     const term = query.trim().toLowerCase();
     if (!term) return users;
     return users.filter(user => [user.name, user.email, user.publicId].some(value => String(value || '').toLowerCase().includes(term)));
-  }, [users, query]);
+ }, [users, query]);
+ 
+ const tabClasses = (tab) => `admin-tab ${activeTab === tab ? 'active' : ''}`;
 
-  if (!auth) return <div className="empty-state">{authError ? <><p role="alert">{authError}</p><button className="button secondary" onClick={check}>Thử lại</button></> : <CircleNotch size={30} className="spin" />}</div>;
+ if (!auth) return <div className="empty-state">{authError ? <><p role="alert">{authError}</p><button className="button secondary" onClick={check}>Thử lại</button></> : <CircleNotch size={30} className="spin" />}</div>;
 
   if (!auth.authenticated) return <section className="auth-layout">
     <div className="auth-copy">
@@ -341,19 +360,36 @@ export function Admin({ notify }) {
 
   return (
     <>
-      <div className="admin-heading">
-        <div>
-          <div className="eyebrow">MIUZIG STUDIO</div>
-          <h1>Quản lý người dùng.</h1>
-        </div>
-        <div>
-          <button className="button secondary" onClick={() => setChangePasswordModal(true)}>
-            <LockKey size={18} /> Đổi mật khẩu
-          </button>
-          <button className="button secondary" onClick={logout}><SignOut size={18} /> Đăng xuất</button>
-        </div>
-      </div>
+     <div className="admin-heading">
+       <div>
+         <div className="eyebrow">MIUZIG STUDIO</div>
+         <h1>Quản lý người dùng.</h1>
+       </div>
+       <div>
+         <button className="button secondary" onClick={() => setChangePasswordModal(true)}>
+           <LockKey size={18} /> Đổi mật khẩu
+         </button>
+         <button className="button secondary" onClick={logout}><SignOut size={18} /> Đăng xuất</button>
+       </div>
+     </div>
+ 
+     <div className="admin-tabs">
+       <button 
+         className={tabClasses('users')} 
+         onClick={() => setActiveTab('users')}
+       >
+         <UsersThree size={16} /> Quản lý người dùng
+       </button>
+       <button 
+         className={tabClasses('messages')} 
+         onClick={() => setActiveTab('messages')}
+       >
+         <MessageSquare size={16} /> Tin nhắn
+       </button>
+     </div>
 
+    <div className="admin-users-dashboard">
+    {activeTab === 'users' ? (
       <div className="admin-users-dashboard">
         <section className="admin-stats">
           <StatCard icon={UsersThree} label="Tài khoản đã tạo" value={stats.total} note="Tổng số thành viên" />
@@ -466,8 +502,54 @@ export function Admin({ notify }) {
             </div>
           )}
         </section>
-      </div>
-      {renderModal()}
+     </div>
+     ) : (
+       <div className="admin-messages-panel">
+         <div className="admin-toolbar">
+           <div>
+             <h2>Tin nhắn <span>{messages.length}</span></h2>
+             <p>Những tin nhắn từ khách truy cập qua Sổ lưu bút.</p>
+           </div>
+           <div className="admin-user-tools">
+             <button className="button secondary" onClick={loadMessages} disabled={loadingMessages}>{loadingMessages ? <CircleNotch className="spin" size={17} /> : 'Tải lại'}</button>
+           </div>
+         </div>
+ 
+         {loadingMessages && !messages.length ? (
+           <div className="empty-state">
+             <CircleNotch className="spin" size={30} />
+             <p>Đang tải tin nhắn...</p>
+           </div>
+         ) : messages.length ? (
+           <div className="admin-messages-list">
+             {messages.map(message => (
+               <div key={message.id} className="admin-message-item">
+                 <div className="admin-message-header">
+                   <strong>{message.name || 'Khách ẩn danh'}</strong>
+                   <span>{new Date(message.createdAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                 </div>
+                 {message.email && (
+                   <div className="admin-message-email">
+                     <a href={`mailto:${message.email}`}>{message.email}</a>
+                   </div>
+                 )}
+                 <div className="admin-message-content">
+                   {message.message}
+                 </div>
+               </div>
+             ))}
+           </div>
+         ) : (
+           <div className="empty-state">
+             <NotePencil size={34} />
+             <h3>Chưa có tin nhắn nào.</h3>
+             <p>Khi khách truy cập để lại tin nhắn qua Sổ lưu bút, tin nhắn sẽ xuất hiện ở đây.</p>
+           </div>
+         )}
+       </div>
+    )}
+    </div>
+     {renderModal()}
 {renderPasswordChangeModal()}
     </>
   );
