@@ -191,7 +191,50 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   app.put('/api/users/profile', authUser, ...[].concat(profileMiddleware));
   app.post('/api/users/logout', async (req, res) => { await query('DELETE FROM user_sessions WHERE token=?', [digest(userTokenFrom(req))]); res.clearCookie('melodik_user', { path: '/' }); res.json({ ok: true }); });
   app.post('/api/messages', async (req, res) => { await limit(`message:${req.ip}`, 5); await query('INSERT INTO messages (id,name,email,message,createdAt) VALUES (?,?,?,?,?)', [makeId(), text(req.body.name, 80), email(req.body.email), text(req.body.message, 3000), new Date().toISOString()]); res.status(201).json({ ok: true }); });
-  app.get('/api/admin/users', auth, async (_req, res) => res.json(await all(`SELECT users.id,users.name,users.email,users.publicId,users.avatar,users.bio,users.lastActiveAt,users.createdAt,(SELECT COUNT(*) FROM community_tracks WHERE community_tracks.userId=users.id) AS trackCount,(SELECT COUNT(*) FROM community_photos WHERE community_photos.userId=users.id) AS photoCount,(SELECT COUNT(*) FROM friendships WHERE (friendships.userId=users.id OR friendships.friendId=users.id) AND friendships.status='accepted') AS friendCount FROM users ORDER BY users.createdAt DESC`)));
+  app.get('/api/admin/users', auth, async (_req, res) => {
+  const results = await all(`
+    SELECT
+      u.id,
+      u.name,
+      u.email,
+      u.publicId,
+      u.avatar,
+      u.bio,
+      u.lastActiveAt,
+      u.createdAt,
+      COALESCE(tc.count, 0) AS trackCount,
+      COALESCE(pc.count, 0) AS photoCount,
+      COALESCE(fc.count, 0) AS friendCount
+    FROM users u
+    LEFT JOIN (
+      SELECT userId, COUNT(*) AS count
+      FROM community_tracks
+      GROUP BY userId
+    ) tc ON u.id = tc.userId
+    LEFT JOIN (
+      SELECT userId, COUNT(*) AS count
+      FROM community_photos
+      GROUP BY userId
+    ) pc ON u.id = pc.userId
+    LEFT JOIN (
+      SELECT
+        CASE
+          WHEN userId < friendId THEN userId
+          ELSE friendId
+        END AS userId,
+        COUNT(*) AS count
+      FROM friendships
+      WHERE status = 'accepted'
+      GROUP BY
+        CASE
+          WHEN userId < friendId THEN userId
+          ELSE friendId
+        END
+    ) fc ON u.id = fc.userId
+    ORDER BY u.createdAt DESC
+  `);
+  res.json(results);
+});
   app.get('/api/admin/users/:id/tracks', auth, async (req, res) => {
     const { id } = req.params;
     // Ensure the logged-in admin is requesting data for a valid user
