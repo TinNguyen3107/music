@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, MessageSquare, NotePencil, SignOut, UserCircle, UsersThree } from '@phosphor-icons/react';
+import { ArrowRight, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, NotePencil, SignOut, UserCircle, UsersThree } from '@phosphor-icons/react';
 import { api, Modal } from './shared.jsx';
 
 const activeWindowMs = 60 * 1000;
@@ -384,7 +384,7 @@ export function Admin({ notify }) {
          className={tabClasses('messages')} 
          onClick={() => setActiveTab('messages')}
        >
-         <MessageSquare size={16} /> Tin nhắn
+         <ChatCircle size={16} /> Tin nhắn
        </button>
      </div>
 
@@ -541,7 +541,7 @@ export function Admin({ notify }) {
            </div>
          ) : (
            <div className="empty-state">
-             <MessageSquare size={34} />
+             <ChatCircle size={34} />
              <h3>Chưa có tin nhắn nào.</h3>
              <p>Khi khách truy cập để lại tin nhắn qua Sổ lưu bút, tin nhắn sẽ xuất hiện ở đây.</p>
            </div>

@@ -8,5 +8,8 @@
     "start": "npm --prefix app start",
     "test": "npm --prefix app test",
     "migrate": "npm --prefix app run migrate"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2.1.10"
   }
 }
