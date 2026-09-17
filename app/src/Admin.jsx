@@ -431,7 +431,7 @@ export function Admin({ notify }) {
                               })
                           }}
                         >
-                          {Number(user.trackCount || 0)}
+                          {Number(user.trackCount) || 0}
                         </td>
                         <td
                           onClick={() => {
@@ -449,9 +449,9 @@ export function Admin({ notify }) {
                               });
                           }}
                         >
-                          {Number(user.photoCount || 0)}
+                          {Number(user.photoCount) || 0}
                         </td>
-                        <td>{Number(user.friendcount || user.friendCount || 0)}</td>
+                        <td>{Number(user.friendCount) || 0}</td>
                       </tr>
                     );
                   })}
