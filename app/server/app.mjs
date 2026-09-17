@@ -191,7 +191,50 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   app.put('/api/users/profile', authUser, ...[].concat(profileMiddleware));
   app.post('/api/users/logout', async (req, res) => { await query('DELETE FROM user_sessions WHERE token=?', [digest(userTokenFrom(req))]); res.clearCookie('melodik_user', { path: '/' }); res.json({ ok: true }); });
   app.post('/api/messages', async (req, res) => { await limit(`message:${req.ip}`, 5); await query('INSERT INTO messages (id,name,email,message,createdAt) VALUES (?,?,?,?,?)', [makeId(), text(req.body.name, 80), email(req.body.email), text(req.body.message, 3000), new Date().toISOString()]); res.status(201).json({ ok: true }); });
-  app.get('/api/admin/users', auth, async (_req, res) => res.json(await all(`SELECT users.id,users.name,users.email,users.publicId,users.avatar,users.bio,users.lastActiveAt,users.createdAt,COALESCE((SELECT COUNT(*) FROM community_tracks WHERE community_tracks.userId=users.id), 0) AS trackCount,COALESCE((SELECT COUNT(*) FROM community_photos WHERE community_photos.userId=users.id), 0) AS photoCount,(SELECT COUNT(*) FROM friendships WHERE (friendships.userId=users.id OR friendships.friendId=users.id) AND friendships.status='accepted') AS friendCount FROM users ORDER BY users.createdAt DESC`)));
+  app.get('/api/admin/users', auth, async (_req, res) => {
+  const results = await all(`
+    SELECT
+      u.id,
+      u.name,
+      u.email,
+      u.publicId,
+      u.avatar,
+      u.bio,
+      u.lastActiveAt,
+      u.createdAt,
+      COALESCE(tc.track_count, 0) AS trackCount,
+      COALESCE(cp.photo_count, 0) AS photoCount,
+      COALESCE(f.friend_count, 0) AS friendCount
+    FROM users u
+    LEFT JOIN (
+      SELECT userId, COUNT(*) AS track_count
+      FROM community_tracks
+      GROUP BY userId
+    ) tc ON u.id = tc.userId
+    LEFT JOIN (
+      SELECT userId, COUNT(*) AS photo_count
+      FROM community_photos
+      GROUP BY userId
+    ) cp ON u.id = cp.userId
+    LEFT JOIN (
+      SELECT
+        CASE
+          WHEN userId < friendId THEN userId
+          ELSE friendId
+        END AS userId,
+        COUNT(*) AS friend_count
+      FROM friendships
+      WHERE status = 'accepted'
+      GROUP BY
+        CASE
+          WHEN userId < friendId THEN userId
+          ELSE friendId
+        END
+    ) f ON u.id = f.userId
+    ORDER BY u.createdAt DESC
+  `);
+  res.json(results);
+});
   app.get('/api/admin/users/:id/tracks', auth, async (req, res) => {
     const { id } = req.params;
     // Ensure the logged-in admin is requesting data for a valid user
@@ -342,6 +385,20 @@ app.post('/api/auth/password', auth, async (req, res) => {
   const chatMiddleware = production ? saveChatMessage : [upload.single('attachment'), saveChatMessage];
   app.post('/api/chat/:id', authUser, ...[].concat(chatMiddleware));
   app.post('/api/chat/:id/react', authUser, async (req, res) => { const reaction = text(req.body.reaction || '', 20, false), message = await row('SELECT * FROM chat_messages WHERE id=?', [req.params.id]); if (!message || (message.senderId !== req.user.id && message.recipientId !== req.user.id)) throw fail('Không tìm thấy tin nhắn.', 404); await query('UPDATE chat_messages SET reaction=? WHERE id=?', [reaction, req.params.id]); res.json({ ok: true }); });
+
+app.delete('/api/chat/:messageId', authUser, async (req, res) => {
+  const { messageId } = req.params;
+  // Verify the message exists and user is either sender or recipient
+  const message = await row('SELECT * FROM chat_messages WHERE id=?', [messageId]);
+  if (!message) {
+    return res.status(404).json({ error: 'Không tìm thấy tin nhắn.' });
+  }
+  if (message.senderId !== req.user.id && message.recipientId !== req.user.id) {
+    return res.status(403).json({ error: 'Bạn không có quyền xóa tin nhắn này.' });
+  }
+  await query('DELETE FROM chat_messages WHERE id=?', [messageId]);
+  res.json({ ok: true });
+});
 
   async function saveTrack(req, res) {
     const previous = req.params.id ? await row('SELECT * FROM tracks WHERE id=?', [req.params.id]) : null;
