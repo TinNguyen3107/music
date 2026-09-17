@@ -63,14 +63,14 @@
   background:none;
   border:none;
   color:var(--muted);
-  font-size:1.2rem;
+  font-size:1.1rem;
   cursor:pointer;
-  width:36px;
-  height:36px;
+  width:30px;
+  height:30px;
   display:flex;
   align-items:center;
   justify-content:center;
-  border-radius:50%;
+  border-radius:6px;
   transition:all 0.2s ease;
 }
 .message-actions button:hover{
