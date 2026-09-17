@@ -33,8 +33,22 @@ function StatCard({ icon: Icon, label, value, note }) {
   </article>;
 }
 
-export function Admin({ notify, navigate }) {
-  const [auth, setAuth] = useState(null);
+export function Admin({
+  notify,
+  navigate,
+  catalog,
+  refresh,
+  adminAuth,
+  activeTab,
+  setActiveTab,
+  profileDropdownOpen,
+  setProfileDropdownOpen,
+  logout,
+  openProfileModal,
+  setAdminAuth,
+  onProfileUpdate
+}) {
+  const [auth, setAuth] = useState(adminAuth); // sync with prop
   const [authError, setAuthError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [users, setUsers] = useState([]);
@@ -54,19 +68,22 @@ export function Admin({ notify, navigate }) {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   // Messages tab state
-  const [activeTab, setActiveTab] = useState('users');
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
-  // Profile dropdown and modal state
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  // Profile modal state (internal to Admin)
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [profileSuccess, setProfileSuccess] = useState(false);
-  const [editName, setEditName] = useState(auth?.name || '');
-  const [editEmail, setEditEmail] = useState(auth?.email || '');
+  const [editName, setEditName] = useState(adminAuth?.name || '');
+  const [editEmail, setEditEmail] = useState(adminAuth?.email || '');
   const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(auth?.avatar || null);
+  const [avatarPreview, setAvatarPreview] = useState(adminAuth?.avatar || '/artwork/sleeve.webp');
+
+  // Sync adminAuth prop to local state (if it changes from outside)
+  useEffect(() => {
+    setAuth(adminAuth);
+  }, [adminAuth]);
 
   const check = () => api('/api/auth/me').then(setAuth).catch(error => setAuthError(error.message));
 
@@ -93,11 +110,11 @@ export function Admin({ notify, navigate }) {
     }
   }
 
-  useEffect(() => { check(); }, []);
+  useEffect(() => { check(); }, [auth?.authenticated]);
   useEffect(() => { if (auth?.authenticated) loadUsers(); }, [auth?.authenticated]);
   useEffect(() => { if (auth?.authenticated) loadMessages(); }, [auth?.authenticated]);
 
-  // Close profile dropdown when clicking outside
+  // Close profile dropdown when clicking outside (handled in App, but we keep for safety)
   useEffect(() => {
     function handleClickOutside(event) {
       if (profileDropdownOpen) {
@@ -201,8 +218,8 @@ export function Admin({ notify, navigate }) {
         body: formData
       });
 
-      // Update auth state with new data
-      setAuth(prev => ({
+      // Update auth state via prop
+      setAdminAuth(prev => ({
         ...prev,
         ...updatedAuth,
         name: editName,
@@ -215,15 +232,26 @@ export function Admin({ notify, navigate }) {
 
       setProfileSuccess(true);
 
+      // Notify parent to update its adminAuth state (if needed)
+      if (onProfileUpdate) {
+        onProfileUpdate({
+          ...prev,
+          ...updatedAuth,
+          name: editName,
+          email: editEmail,
+          avatar: updatedAuth.avatar || prev.avatar
+        });
+      }
+
       // Auto-close modal after success
       setTimeout(() => {
         setShowProfileModal(false);
         setProfileSuccess(false);
         // Reset form
-        setEditName(auth?.name || '');
-        setEditEmail(auth?.email || '');
+        setEditName(adminAuth?.name || '');
+        setEditEmail(adminAuth?.email || '');
         setAvatarFile(null);
-        setAvatarPreview(auth?.avatar || '/artwork/sleeve.webp');
+        setAvatarPreview(adminAuth?.avatar || '/artwork/sleeve.webp');
       }, 1500);
     } catch (error) {
       setProfileError(error.message || 'Đã xảy ra lỗi khi lưu hồ sơ');
@@ -232,18 +260,20 @@ export function Admin({ notify, navigate }) {
     }
   }
 
-  async function logout() {
+  async function handleLogout() {
     try {
       await api('/api/auth/logout', { method: 'POST' });
       setAuth({ authenticated: false, needsSetup: false });
       setUsers([]);
       setMessages([]);
+      // Notify parent to clear adminAuth
+      setAdminAuth({ authenticated: false, needsSetup: false });
     } catch (error) {
       notify?.(error.message);
     }
   }
 
-  const openProfileModal = () => {
+  const openProfileModalInternal = () => {
     setEditName(auth?.name || '');
     setEditEmail(auth?.email || '');
     setAvatarFile(null);
@@ -298,8 +328,8 @@ export function Admin({ notify, navigate }) {
       <p>{auth.needsSetup ? 'Thiết lập một lần để quản lý người dùng MIUZIG.' : 'Đăng nhập bằng tài khoản quản trị.'}</p>
       <label>Email<input type="email" name="email" required autoComplete="username" maxLength={254} placeholder="admin@gmail.com" /></label>
       <label className="password-field">Mật khẩu<span className="password-input"><input type={showPassword ? 'text' : 'password'} name="password" required minLength={auth.needsSetup ? 6 : 1} maxLength={128} autoComplete={auth.needsSetup ? 'new-password' : 'current-password'} placeholder={auth.needsSetup ? 'Ít nhất 6 ký tự' : 'Mật khẩu quản trị'} /><button type="button" aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}</button></span></label>
-      {auth.needsSetup && auth.requiresSetupToken && <label className="password-field">Mã thiết lập<span className="password-input"><input type={showPassword ? 'text' : 'password'} name="setupToken" required autoComplete="one-time-code" placeholder="Mã chỉ dùng cho lần thiết lập đầu" /><button type="button" aria-label={showPassword ? 'Ẩn mã thiết lập' : 'Hiện mã thiết lập'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}</button></span></label>}
-    {authError && <p className="form-error" role="alert">{authError}</p>}
+      {auth.needsSetup && auth.requiresSetupToken && <label className="password-field">Mã thiết lập<span className="password-input"><input type={showPassword ? 'text' : 'password'} name="setupToken" required autoComplete="one-time-code" placeholder="Mã chỉ dùng cho lần thiết lập đầu" /><button type="button" aria-label={showPassword ? 'Ẩn mã thiết lập' : 'Hiện mã thiết lập'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeSlash size={19} /> : <Eye size={19} />}</button></span></label>
+      {authError && <p className="form-error" role="alert">{authError}</p>}
       <button className="button primary wide" disabled={busy}>{busy ? <CircleNotch className="spin" size={18} /> : <LockKey size={18} />}{auth.needsSetup ? 'Tạo tài khoản & bắt đầu' : 'Đăng nhập quản trị'}<ArrowRight size={17} /></button>
       <a className="auth-community-link" href="/community">Bạn là thành viên? Vào Góc của bạn</a>
     </form>
@@ -548,49 +578,7 @@ export function Admin({ notify, navigate }) {
 
   return (
     <>
-      {/* New Admin Header */}
-      <header className="admin-header">
-        <div className="admin-header-content">
-          <div className="admin-logo">
-            <a href="/" onClick={e => { e.preventDefault(); navigate('/'); }}>
-              MIUZIG<span className="logo-star"><Sparkle size={18} weight="fill" /></span>
-            </a>
-          </div>
-          <div className="admin-header-actions">
-            <button className="admin-header-button" onClick={() => setActiveTab('users')}>
-              <UsersThree size={18} /> Quản trị người dùng
-            </button>
-            <button className="admin-header-button" onClick={() => setActiveTab('messages')}>
-              <ChatCircle size={18} /> Tin nhắn
-            </button>
-            <div className="admin-profile-dropdown" onClick={(e) => { e.stopPropagation(); setProfileDropdownOpen(!profileDropdownOpen); }}>
-              <img src={auth.avatar || '/artwork/sleeve.webp'} alt={auth.name} className="admin-avatar" />
-              <div className="admin-profile-info">
-                <span className="admin-name">{auth.name}</span>
-                <span className="admin-email">{auth.email}</span>
-              </div>
-              <ArrowDown size={14} className="admin-dropdown-arrow" />
-            </div>
-          </div>
-        </div>
-        {profileDropdownOpen && (
-          <div className="admin-profile-dropdown-menu">
-            <div className="admin-profile-dropdown-item" onClick={openProfileModal}>
-              <img src={auth.avatar || '/artwork/sleeve.webp'} alt={auth.name} className="admin-dropdown-avatar" />
-              <span>{auth.name}</span>
-            </div>
-            <div className="admin-profile-dropdown-item" onClick={openProfileModal}>
-              Hồ sơ
-            </div>
-            <div className="admin-profile-dropdown-item" onClick={logout}>
-              Đăng xuất
-            </div>
-          </div>
-        )}
-      </header>
-
-      {/* Admin Content Tabs (now as buttons in header, so we remove the old tab container) */}
-      {/* Content area */}
+      {/* Admin Content Tabs (now as buttons in header in App, so we render only the content area) */}
       <div className="admin-content">
         {activeTab === 'users' ? (
           <div className="admin-users-dashboard">
@@ -746,7 +734,7 @@ export function Admin({ notify, navigate }) {
               <div className="empty-state">
                 <ChatCircle size={34} />
                 <h3>Chưa có tin nhắn nào.</h3>
-                <p>Khi khách truy cập để lại tin nhắn qua Sổ lưu bút, tin nhắn sẽ xuất hiện ở đây.</p>
+                <p>Khi khách truy cập để lại tin nhäne qua Sổ lưu bút, tin nhắn sẽ xuất hiện ở đây.</p>
               </div>
             )}
           </div>
@@ -756,195 +744,6 @@ export function Admin({ notify, navigate }) {
       {renderModal()}
       {renderPasswordChangeModal()}
       {renderProfileModal()}
-      {/* Global styles for new components */}
-      <style>{`
-        .admin-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 1rem 2rem;
-          background-color: var(--background, #fff);
-          border-bottom: 1px solid var(--border-color, #eee);
-        }
-        .admin-header-content {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          width: 100%;
-        }
-        .admin-logo {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-        .admin-logo a {
-          text-decoration: none;
-          color: inherit;
-          font-weight: bold;
-          font-size: 1.5rem;
-        }
-        .admin-logo .logo-star {
-          color: var(--accent, #ff9800);
-        }
-        .admin-header-actions {
-          display: flex;
-          align-items: center;
-          gap: 1.5rem;
-        }
-        .admin-header-button {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          background: none;
-          border: none;
-          color: var(--text-color, #333);
-          font-size: 1rem;
-          cursor: pointer;
-          padding: 0.5rem 1rem;
-          border-radius: var(--border-radius, 4px);
-          transition: background-color 0.2s;
-        }
-        .admin-header-button:hover {
-          background-color: var(--hover-bg, #f5f5f5);
-        }
-        .admin-header-button .UsersThree,
-        .admin-header-button .ChatCircle {
-          color: var(--icon-color, #555);
-        }
-        .admin-profile-dropdown {
-          position: relative;
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          cursor: pointer;
-          padding: 0.5rem;
-          border-radius: var(--border-radius, 4px);
-          transition: background-color 0.2s;
-        }
-        .admin-profile-dropdown:hover {
-          background-color: var(--hover-bg, #f5f5f5);
-        }
-        .admin-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          object-fit: cover;
-          border: 2px solid var(--border-color, #ddd);
-        }
-        .admin-profile-info {
-          display: flex;
-          flex-direction: column;
-          font-size: 0.875rem;
-        }
-        .admin-name {
-          font-weight: 600;
-          color: var(--text-color, #333);
-        }
-        .admin-email {
-          color: var(--text-light, #666);
-          font-size: 0.75rem;
-        }
-        .admin-dropdown-arrow {
-          transition: transform 0.2s;
-        }
-        .admin-profile-dropdown.open .admin-dropdown-arrow {
-          transform: rotate(180deg);
-        }
-        .admin-profile-dropdown-menu {
-          position: absolute;
-          top: 100%;
-          right: 0;
-          margin-top: 0.5rem;
-          background-color: var(--background, #fff);
-          border: 1px solid var(--border-color, #eee);
-          border-radius: var(--border-radius, 4px);
-          box-shadow: var(--shadow, 0 4px 6px rgba(0,0,0,0.1));
-          width: 200px;
-          padding: 0.5rem 0;
-          z-index: 1000;
-        }
-        .admin-profile-dropdown-item {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 0.75rem 1rem;
-          cursor: pointer;
-          transition: background-color 0.2s;
-        }
-        .admin-profile-dropdown-item:hover {
-          background-color: var(--hover-bg, #f5f5f5);
-        }
-        .admin-dropdown-avatar {
-          width: 28px;
-          height: 28px;
-          border-radius: 50%;
-          object-fit: cover;
-        }
-        .admin-content {
-          padding: 2rem;
-        }
-        .avatar-preview {
-          text-align: center;
-          margin-bottom: 1.5rem;
-        }
-        .avatar-preview-image {
-          width: 100px;
-          height: 100px;
-          border-radius: 50%;
-          object-fit: cover;
-          border: 2px solid var(--border-color, #eee);
-          margin-bottom: 0.5rem;
-        }
-        .avatar-upload-input {
-          display: none;
-        }
-        .avatar-upload-label {
-          display: inline-block;
-          padding: 0.5rem 1rem;
-          background-color: var(--accent, #ff9800);
-          color: white;
-          border-radius: var(--border-radius, 4px);
-          cursor: pointer;
-          font-size: 0.875rem;
-        }
-        .avatar-upload-label:hover {
-          background-color: #e68900;
-        }
-        .form-group {
-          margin-bottom: 1rem;
-        }
-        .form-group label {
-          display: block;
-          margin-bottom: 0.25rem;
-          font-weight: 500;
-        }
-        .form-input {
-          width: 100%;
-          padding: 0.75rem;
-          border: 1px solid var(--border-color, #ddd);
-          border-radius: var(--border-radius, 4px);
-          font-size: 0.875rem;
-        }
-        .form-input:focus {
-          outline: none;
-          border-color: var(--accent, #ff9800);
-          box-shadow: 0 0 0 2px rgba(255,152,0,0.2);
-        }
-        .form-actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 1rem;
-          margin-top: 2rem;
-        }
-        .form-success {
-          color: var(--success, #4caf50);
-          margin: 1rem 0;
-        }
-        .form-error {
-          color: var(--error, #f44336);
-          margin: 1rem 0;
-        }
-      `}</style>
     </>
   );
 }
