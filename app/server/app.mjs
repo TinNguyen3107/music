@@ -11,6 +11,11 @@ const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const digest = value => createHash('sha256').update(value).digest('hex');
 const makeId = () => randomBytes(12).toString('hex');
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
+const passwordMatches = (password, salt, storedHash) => {
+  const expected = Buffer.from(String(storedHash || ''), 'hex');
+  const actual = scryptSync(password, salt || 'missing-user', 64);
+  return expected.length === actual.length && timingSafeEqual(actual, expected);
+};
 const text = (value, max = 200, required = true) => {
   if (typeof value !== 'string' || value.trim().length > max || (required && !value.trim())) throw fail('Vui lòng kiểm tra nội dung và độ dài các trường.');
   return value.trim();
@@ -151,8 +156,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   app.post('/api/auth/login', async (req, res) => {
     await limit(`login:${req.ip}`);
     const mail = email(req.body.email), password = text(req.body.password, 128), admin = await row('SELECT * FROM admin WHERE email=?', [mail]);
-    const hash = scryptSync(password, admin?.salt || 'missing-user', 64);
-    if (!admin || !timingSafeEqual(hash, Buffer.from(admin.passwordHash, 'hex'))) throw fail('Email hoặc mật khẩu chưa đúng.', 401);
+    if (!admin || !passwordMatches(password, admin.salt, admin.passwordHash)) throw fail('Email hoặc mật khẩu chưa đúng.', 401);
     await createSession(res); res.json({ ok: true });
   });
   app.post('/api/auth/logout', async (req, res) => { await query('DELETE FROM sessions WHERE token=?', [digest(tokenFrom(req))]); res.clearCookie('melodik_session', { path: '/' }); res.json({ ok: true }); });
@@ -188,8 +192,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   app.post('/api/users/login', async (req, res) => {
     await limit(`user-login:${req.ip}`);
     const mail = email(req.body.email), password = text(req.body.password, 128), user = await row('SELECT * FROM users WHERE email=?', [mail]);
-    const hash = scryptSync(password, user?.salt || 'missing-user', 64);
-    if (!user || !timingSafeEqual(hash, Buffer.from(user.passwordHash, 'hex'))) throw fail('Email hoặc mật khẩu chưa đúng.', 401);
+    if (!user || !passwordMatches(password, user.salt, user.passwordHash)) throw fail('Email hoặc mật khẩu chưa đúng.', 401);
     await createUserSession(res, user.id); res.json({ user: { id: user.id, name: user.name, email: user.email, publicId: user.publicId, avatar: user.avatar, bio: user.bio || '', lastActiveAt: new Date().toISOString() } });
   });
   app.post('/api/users/heartbeat', authUser, async (req, res) => { const now = new Date().toISOString(); await query('UPDATE users SET lastActiveAt=? WHERE id=?', [now, req.user.id]); res.json({ ok: true, lastActiveAt: now }); });
@@ -285,8 +288,7 @@ app.post('/api/auth/password', auth, async (req, res) => {
   }
 
   // Verify current password
-  const hash = scryptSync(currentPassword, admin.salt || '', 64);
-  if (!timingSafeEqual(hash, Buffer.from(admin.passwordHash, 'hex'))) {
+  if (!passwordMatches(currentPassword, admin.salt, admin.passwordHash)) {
     return res.status(401).json({ error: 'Current password is incorrect' });
   }
 

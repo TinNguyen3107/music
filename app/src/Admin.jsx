@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ArrowUpRight, ArrowDown, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, NotePencil, SignOut, Sparkle, UserCircle, UsersThree } from '@phosphor-icons/react';
+import { upload as uploadToBlob } from '@vercel/blob/client';
 import { api, Modal } from './shared.jsx';
 
 const activeWindowMs = 60 * 1000;
@@ -31,6 +32,27 @@ function StatCard({ icon: Icon, label, value, note }) {
       {note && <small>{note}</small>}
     </div>
   </article>;
+}
+
+async function adminProfileBody(name, email, avatarFile, storage) {
+  const form = new FormData();
+  form.set('name', name);
+  form.set('email', email);
+  if (avatarFile) form.set('avatar', avatarFile);
+  if (storage.storage !== 'blob') return form;
+  if (avatarFile) {
+    const extension = avatarFile.name.includes('.') ? `.${avatarFile.name.split('.').pop().replace(/[^a-z0-9]/gi, '').slice(0, 8)}` : '';
+    const blob = await uploadToBlob(`melodik/image/${crypto.randomUUID()}${extension}`, avatarFile, {
+      access: 'public',
+      contentType: avatarFile.type || undefined,
+      handleUploadUrl: '/api/admin/upload-token',
+      clientPayload: JSON.stringify({ kind: 'image' })
+    });
+    form.delete('avatar');
+    form.set('avatarUrl', blob.url);
+    form.set('avatarPathname', blob.pathname);
+  }
+  return JSON.stringify(Object.fromEntries(form));
 }
 
 export function Admin({
@@ -201,16 +223,12 @@ export function Admin({
 
     setProfileLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('name', editName);
-      formData.append('email', editEmail);
-      if (avatarFile) {
-        formData.append('avatar', avatarFile);
-      }
+      const storage = await api('/api/config');
+      const body = await adminProfileBody(editName, editEmail, avatarFile, storage);
 
       const updatedAuth = await api('/api/auth/profile', {
         method: 'POST',
-        body: formData
+        body
       });
 
       const nextAuth = {

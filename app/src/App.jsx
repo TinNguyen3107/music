@@ -48,9 +48,9 @@ export function App() {
       return '';
     }
   }, []);
-  const refreshCurrentUser = useCallback(async () => { try { const data = await api('/api/users/me'); setMe(data.user || null); return data.user || null; } catch { setMe(null); return null; } });
-  const refreshUserSettings = useCallback(async () => { try { const data = await api('/api/users/settings'); setUserSettings(data.settings || {}); } catch { setUserSettings({}); } });
-  const refresh = useCallback(async () => { try { const data = await api('/api/catalog'); setCatalog(data); setLoadError(''); return data; } catch (e) { setLoadError(e.message); } });
+  const refreshCurrentUser = useCallback(async () => { try { const data = await api('/api/users/me'); setMe(data.user || null); return data.user || null; } catch { setMe(null); return null; } }, []);
+  const refreshUserSettings = useCallback(async () => { try { const data = await api('/api/users/settings'); setUserSettings(data.settings || {}); } catch { setUserSettings({}); } }, []);
+  const refresh = useCallback(async () => { try { const data = await api('/api/catalog'); setCatalog(data); setLoadError(''); return data; } catch (e) { setLoadError(e.message); } }, []);
   // Admin auth state
   const [adminAuth, setAdminAuth] = useState(null);
   const [adminAuthError, setAdminAuthError] = useState('');
