@@ -57,6 +57,7 @@ export function App() {
   // Admin UI state
   const [activeTab, setActiveTab] = useState('users');
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [profileRequest, setProfileRequest] = useState(0);
 
   useEffect(() => { refreshCurrentUser(); refreshUserSettings(); refresh(); }, [refreshCurrentUser, refreshUserSettings, refresh]);
   useEffect(() => {
@@ -266,16 +267,16 @@ export function App() {
         {/* Profile dropdown (only for admin) */}
         {isAdmin && profileDropdownOpen && (
           <div className="admin-profile-dropdown-menu">
-            <div className="admin-profile-dropdown-item" onClick={() => { setProfileDropdownOpen(false); }}>
-              <img src={adminAuth?.avatar || '/artwork/sleeve.webp'} alt={adminAuth?.name} className="admin-dropdown-avatar" />
-              <span>{adminAuth?.name}</span>
+            <div className="admin-profile-dropdown-summary">
+              <img src={adminAuth?.avatar || '/artwork/sleeve.webp'} alt="" className="admin-dropdown-avatar" />
+              <span><strong>{adminAuth?.name || 'Quản trị viên'}</strong><small>{adminAuth?.email || 'MIUZIG Studio'}</small></span>
             </div>
-            <div className="admin-profile-dropdown-item" onClick={() => { setProfileDropdownOpen(false); }}>
-              Hồ sơ
-            </div>
-            <div className="admin-profile-dropdown-item" onClick={handleLogout}>
+            <button type="button" className="admin-profile-dropdown-item" onClick={() => { setProfileDropdownOpen(false); setProfileRequest(request => request + 1); }}>
+              Hồ sơ quản trị
+            </button>
+            <button type="button" className="admin-profile-dropdown-item danger" onClick={handleLogout}>
               Đăng xuất
-            </div>
+            </button>
           </div>
         )}
       </header>
@@ -301,9 +302,8 @@ export function App() {
             adminAuth={adminAuth}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
-            profileDropdownOpen={profileDropdownOpen}
-            setProfileDropdownOpen={setProfileDropdownOpen}
-            logout={handleLogout}
+            profileRequest={profileRequest}
+            setAdminAuth={setAdminAuth}
           />
         ) : route === '/gallery' ? (
           <Gallery photos={catalog.communityPhotos || []} />
@@ -369,8 +369,7 @@ export function App() {
             </button>
             <IconButton className="mini-collapse" icon={CaretDown} label="Thu gọn trình phát" onClick={() => setMiniPlayerCollapsed(true)} />
           </div>
-        )}
-      </footer>
+        ))}
 
       {toast && (
         <div role="status" className="toast show">

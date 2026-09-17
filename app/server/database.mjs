@@ -9,7 +9,7 @@ const sqliteSchema = `
   CREATE TABLE IF NOT EXISTS tracks (id TEXT PRIMARY KEY,playlistId TEXT NOT NULL REFERENCES playlists(id),title TEXT NOT NULL,artist TEXT NOT NULL,genre TEXT NOT NULL,cover TEXT NOT NULL,audio TEXT NOT NULL,duration REAL NOT NULL,isDemo INTEGER DEFAULT 0,position INTEGER,createdAt TEXT);
   CREATE TABLE IF NOT EXISTS photos (id TEXT PRIMARY KEY,title TEXT NOT NULL,image TEXT NOT NULL,category TEXT NOT NULL,location TEXT,caption TEXT,date TEXT,createdAt TEXT);
   CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,message TEXT NOT NULL,createdAt TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS admin (id INTEGER PRIMARY KEY CHECK(id=1),email TEXT NOT NULL,passwordHash TEXT NOT NULL,salt TEXT NOT NULL);
+  CREATE TABLE IF NOT EXISTS admin (id INTEGER PRIMARY KEY CHECK(id=1),email TEXT NOT NULL,name TEXT NOT NULL DEFAULT 'Quản trị viên',avatar TEXT,passwordHash TEXT NOT NULL,salt TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY,expires INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY,count INTEGER NOT NULL,until INTEGER NOT NULL);
   CREATE TABLE IF NOT EXISTS upload_tokens (pathname TEXT PRIMARY KEY,kind TEXT NOT NULL,expires INTEGER NOT NULL,used INTEGER NOT NULL DEFAULT 0);
@@ -31,7 +31,7 @@ const postgresSchema = [
   'CREATE TABLE IF NOT EXISTS tracks (id TEXT PRIMARY KEY, "playlistId" TEXT NOT NULL REFERENCES playlists(id), title TEXT NOT NULL, artist TEXT NOT NULL, genre TEXT NOT NULL, cover TEXT NOT NULL, audio TEXT NOT NULL, duration DOUBLE PRECISION NOT NULL, "isDemo" INTEGER NOT NULL DEFAULT 0, position INTEGER, "createdAt" TEXT)',
   'CREATE TABLE IF NOT EXISTS photos (id TEXT PRIMARY KEY, title TEXT NOT NULL, image TEXT NOT NULL, category TEXT NOT NULL, location TEXT, caption TEXT, date TEXT, "createdAt" TEXT)',
   'CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL, message TEXT NOT NULL, "createdAt" TEXT NOT NULL)',
-  'CREATE TABLE IF NOT EXISTS admin (id INTEGER PRIMARY KEY CHECK(id=1), email TEXT NOT NULL, "passwordHash" TEXT NOT NULL, salt TEXT NOT NULL)',
+  "CREATE TABLE IF NOT EXISTS admin (id INTEGER PRIMARY KEY CHECK(id=1), email TEXT NOT NULL, name TEXT NOT NULL DEFAULT 'Quản trị viên', avatar TEXT, \"passwordHash\" TEXT NOT NULL, salt TEXT NOT NULL)",
   'CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, expires BIGINT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, until BIGINT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS upload_tokens (pathname TEXT PRIMARY KEY, kind TEXT NOT NULL, expires BIGINT NOT NULL, used INTEGER NOT NULL DEFAULT 0)',
@@ -66,6 +66,8 @@ async function runCompatibleMigrations(db, production) {
     }
   };
   if (production) {
+    await add("ALTER TABLE admin ADD COLUMN name TEXT NOT NULL DEFAULT 'Quản trị viên'");
+    await add('ALTER TABLE admin ADD COLUMN avatar TEXT');
     await add('ALTER TABLE users ADD COLUMN "publicId" TEXT');
     await add('ALTER TABLE users ADD COLUMN avatar TEXT');
     await add("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''");
@@ -83,6 +85,8 @@ async function runCompatibleMigrations(db, production) {
     await db.query('CREATE UNIQUE INDEX IF NOT EXISTS users_public_id_idx ON users ("publicId") WHERE "publicId" IS NOT NULL');
     return;
   }
+  if (!sqliteColumn('admin').includes('name')) db.native.exec("ALTER TABLE admin ADD COLUMN name TEXT NOT NULL DEFAULT 'Quản trị viên'");
+  if (!sqliteColumn('admin').includes('avatar')) db.native.exec('ALTER TABLE admin ADD COLUMN avatar TEXT');
   if (!sqliteColumn('users').includes('publicId')) db.native.exec('ALTER TABLE users ADD COLUMN publicId TEXT');
   if (!sqliteColumn('users').includes('avatar')) db.native.exec('ALTER TABLE users ADD COLUMN avatar TEXT');
   if (!sqliteColumn('users').includes('bio')) db.native.exec("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''");

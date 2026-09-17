@@ -33,10 +33,14 @@ test('authenticated content lifecycle, uploads, range playback and persistence',
   assert.equal(setup.status, 201); assert.match(setup.cookie, /HttpOnly/); assert.match(setup.cookie, /SameSite=Strict/);
   cookie = setup.cookie.split(';')[0];
   assert.equal((await call('/api/auth/me')).data.authenticated, true);
+  const adminProfile = new FormData(); adminProfile.set('name', 'Studio Admin'); adminProfile.set('email', 'studio@example.test');
+  assert.equal((await call('/api/auth/profile', 'POST', adminProfile)).status, 200);
+  const savedAdminProfile = (await call('/api/auth/me')).data;
+  assert.equal(savedAdminProfile.name, 'Studio Admin'); assert.equal(savedAdminProfile.email, 'studio@example.test');
   assert.equal((await call('/api/auth/setup', 'POST', { email: 'x@example.test', password: 'another-test-password' })).status, 409);
   assert.equal((await call('/api/messages', 'POST', { name: 'Test', email: 'test@example.test', message: 'Hello' }, { Origin: 'https://untrusted.example' })).status, 403);
-  assert.equal((await call('/api/auth/login', 'POST', { email: 'test@example.test', password: 'sixsix' }, { Origin: 'http://127.0.0.1:3000' })).status, 200);
-  assert.equal((await call('/api/auth/login', 'POST', { email: 'test@example.test', password: 'sixsix' }, { Origin: 'http://localhost:3000' })).status, 200);
+  assert.equal((await call('/api/auth/login', 'POST', { email: 'studio@example.test', password: 'sixsix' }, { Origin: 'http://127.0.0.1:3000' })).status, 200);
+  assert.equal((await call('/api/auth/login', 'POST', { email: 'studio@example.test', password: 'sixsix' }, { Origin: 'http://localhost:3000' })).status, 200);
   const playlist = new FormData(); playlist.set('name', 'Test playlist'); playlist.set('description', 'A temporary playlist'); playlist.set('label', 'TEST');
   const createdPlaylist = await call('/api/admin/playlists', 'POST', playlist); assert.equal(createdPlaylist.status, 201);
   const playlistId = createdPlaylist.data.id;
@@ -95,8 +99,8 @@ test('authenticated content lifecycle, uploads, range playback and persistence',
   assert.equal((await call(`/api/admin/photos/${createdPhoto.data.id}`, 'DELETE')).status, 200);
   assert.equal((await call(`/api/admin/messages/${messages[0].id}`, 'DELETE')).status, 200);
   await call('/api/auth/logout', 'POST'); assert.equal((await call('/api/admin/messages')).status, 401);
-  assert.equal((await call('/api/auth/login', 'POST', { email: 'test@example.test', password: 'bad-password' })).status, 401);
-  assert.equal((await call('/api/auth/login', 'POST', { email: 'test@example.test', password: 'sixsix' })).status, 200);
+  assert.equal((await call('/api/auth/login', 'POST', { email: 'studio@example.test', password: 'bad-password' })).status, 401);
+  assert.equal((await call('/api/auth/login', 'POST', { email: 'studio@example.test', password: 'sixsix' })).status, 200);
   db.native.exec('DELETE FROM tracks; DELETE FROM playlists;');
   const emptied = await createApp({ dataDir, seedDefaultAccounts: false });
   assert.equal(emptied.db.native.prepare('SELECT COUNT(*) AS n FROM playlists').get().n, 0, 'Do not restore demo content after admin empties library');

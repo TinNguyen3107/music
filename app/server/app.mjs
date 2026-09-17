@@ -133,7 +133,11 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     const communityPhotos = user ? await all(`SELECT community_photos.*,users.name AS owner,users.publicId AS ownerPublicId,users.avatar AS ownerAvatar FROM community_photos JOIN users ON users.id=community_photos.userId WHERE community_photos.userId=? ${photoFriendFilter} ORDER BY community_photos.date DESC`, [user.id, ...friendIds]) : [];
     res.json({ playlists: await all('SELECT * FROM playlists ORDER BY position,createdAt'), tracks: await all('SELECT * FROM tracks ORDER BY position,createdAt'), photos: await all('SELECT * FROM photos ORDER BY date DESC'), communityTracks, communityPhotos, settings });
   });
-  app.get('/api/auth/me', async (req, res) => res.json({ authenticated: Boolean(await session(req)), needsSetup: !await row('SELECT id FROM admin'), requiresSetupToken: production }));
+  app.get('/api/auth/me', async (req, res) => {
+    const admin = await row('SELECT email,name,avatar FROM admin WHERE id=1');
+    const authenticated = Boolean(await session(req));
+    res.json({ authenticated, needsSetup: !admin, requiresSetupToken: production, ...(authenticated && admin ? { email: admin.email, name: admin.name || 'Quản trị viên', avatar: admin.avatar || '/artwork/sleeve.webp' } : {}) });
+  });
   app.post('/api/auth/setup', async (req, res) => {
     if (await row('SELECT id FROM admin')) throw fail('Tài khoản quản trị đã được tạo.', 409);
     if (production) { const expected = process.env.ADMIN_BOOTSTRAP_TOKEN || ''; if (!expected || req.body.setupToken !== expected) throw fail('Mã thiết lập quản trị chưa đúng.', 403); }
@@ -141,7 +145,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     const mail = email(req.body.email), password = text(req.body.password, 128);
     if (password.length < 6) throw fail('Mật khẩu cần ít nhất 6 ký tự.');
     const salt = randomBytes(16).toString('hex');
-    await query('INSERT INTO admin (id,email,passwordHash,salt) VALUES (1,?,?,?)', [mail, scryptSync(password, salt, 64).toString('hex'), salt]);
+    await query('INSERT INTO admin (id,email,name,passwordHash,salt) VALUES (1,?,?,?,?)', [mail, 'Quản trị viên', scryptSync(password, salt, 64).toString('hex'), salt]);
     await createSession(res); res.status(201).json({ ok: true });
   });
   app.post('/api/auth/login', async (req, res) => {
@@ -152,6 +156,15 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     await createSession(res); res.json({ ok: true });
   });
   app.post('/api/auth/logout', async (req, res) => { await query('DELETE FROM sessions WHERE token=?', [digest(tokenFrom(req))]); res.clearCookie('melodik_session', { path: '/' }); res.json({ ok: true }); });
+  async function updateAdminProfile(req, res) {
+    const name = text(req.body.name, 80), mail = email(req.body.email);
+    const admin = await row('SELECT avatar FROM admin WHERE id=1');
+    const avatar = await media(req, 'avatar', 'image', admin?.avatar || '/artwork/sleeve.webp');
+    await query('UPDATE admin SET name=?,email=?,avatar=? WHERE id=1', [name, mail, avatar]);
+    res.json({ name, email: mail, avatar });
+  }
+  const adminProfileMiddleware = production ? updateAdminProfile : [upload.single('avatar'), updateAdminProfile];
+  app.post('/api/auth/profile', auth, ...[].concat(adminProfileMiddleware));
   app.get('/api/users/me', async (req, res) => res.json({ user: await userSession(req) || null }));
   app.get('/api/users/settings', async (req, res) => {
     const user = await userSession(req);
