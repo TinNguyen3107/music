@@ -582,7 +582,7 @@ export function Admin({ notify, navigate }) {
             <div className="admin-profile-dropdown-item" onClick={openProfileModal}>
               Hồ sơ
             </div>
-            <div className="admin-profile-dropdown-item" onClick={handleLogout}>
+            <div className="admin-profile-dropdown-item" onClick={logout}>
               Đăng xuất
             </div>
           </div>
