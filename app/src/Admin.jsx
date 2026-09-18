@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ArrowUpRight, ArrowDown, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, NotePencil, SignOut, Sparkle, UserCircle, UsersThree } from '@phosphor-icons/react';
+import { ArrowRight, ArrowUpRight, ArrowDown, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, EnvelopeSimple, MagnifyingGlass, NotePencil, SignOut, Sparkle, UserCircle, UsersThree } from '@phosphor-icons/react';
 import { upload as uploadToBlob } from '@vercel/blob/client';
 import { api, Modal } from './shared.jsx';
 
@@ -88,6 +88,7 @@ export function Admin({
   // Messages tab state
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [messageQuery, setMessageQuery] = useState('');
   // Profile modal state (internal to Admin)
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -298,6 +299,12 @@ export function Admin({
     if (!term) return users;
     return users.filter(user => [user.name, user.email, user.publicId].some(value => String(value || '').toLowerCase().includes(term)));
   }, [users, query]);
+
+  const filteredMessages = useMemo(() => {
+    const term = messageQuery.trim().toLowerCase();
+    if (!term) return messages;
+    return messages.filter(message => [message.name, message.email, message.message].some(value => String(value || '').toLowerCase().includes(term)));
+  }, [messages, messageQuery]);
 
   const tabClasses = (tab) => `admin-tab ${activeTab === tab ? 'active' : ''}`;
 
@@ -708,48 +715,60 @@ export function Admin({
             </section>
           </div>
         ) : (
-          <div className="admin-messages-panel">
-            <div className="admin-toolbar">
-              <div>
-                <h2>Tin nhắn <span>{messages.length}</span></h2>
-                <p>Những tin nhắn từ khách truy cập qua Sổ lưu bút.</p>
+          <div className="admin-messages-dashboard">
+            <section className="admin-messages-panel">
+              <div className="admin-messages-topline">
+                <div>
+                  <span className="eyebrow"><ChatCircle size={15} weight="fill" /> SỔ LƯU BÚT</span>
+                  <h2>Hộp thư góp lời <span>{messages.length}</span></h2>
+                  <p>Phản hồi công khai do khách truy cập gửi qua trang Sổ lưu bút.</p>
+                </div>
+                <button className="button secondary" onClick={loadMessages} disabled={loadingMessages}>
+                  {loadingMessages ? <CircleNotch className="spin" size={17} /> : <ArrowDown size={17} />}
+                  {loadingMessages ? 'Đang tải' : 'Làm mới'}
+                </button>
               </div>
-              <div className="admin-user-tools">
-                <button className="button secondary" onClick={loadMessages} disabled={loadingMessages}>{loadingMessages ? <CircleNotch className="spin" size={17} /> : 'Tải lại'}</button>
+
+              <div className="admin-message-filters">
+                <label className="admin-message-search">
+                  <MagnifyingGlass size={18} aria-hidden="true" />
+                  <span className="sr-only">Tìm tin nhắn</span>
+                  <input value={messageQuery} onChange={event => setMessageQuery(event.target.value)} placeholder="Tìm theo tên, email hoặc nội dung…" />
+                </label>
+                <span className="admin-message-result-count">{filteredMessages.length} / {messages.length} tin nhắn</span>
               </div>
-            </div>
 
             {loadingMessages && !messages.length ? (
               <div className="empty-state">
                 <CircleNotch className="spin" size={30} />
                 <p>Đang tải tin nhắn...</p>
               </div>
-            ) : messages.length ? (
+            ) : filteredMessages.length ? (
               <div className="admin-messages-list">
-                {messages.map(message => (
-                  <div key={message.id} className="admin-message-item">
-                    <div className="admin-message-header">
-                      <strong>{message.name || 'Khách ẩn danh'}</strong>
-                      <span>{new Date(message.createdAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
-                    </div>
-                    {message.email && (
-                      <div className="admin-message-email">
-                        <a href={`mailto:${message.email}`}>{message.email}</a>
+                {filteredMessages.map(message => (
+                  <article key={message.id} className="admin-message-item">
+                    <div className="admin-message-avatar" aria-hidden="true">{(message.name || 'K').trim().slice(0, 1).toUpperCase()}</div>
+                    <div className="admin-message-main">
+                      <div className="admin-message-header">
+                        <div>
+                          <strong>{message.name || 'Khách ẩn danh'}</strong>
+                          {message.email ? <a href={`mailto:${message.email}`}><EnvelopeSimple size={14} />{message.email}</a> : <span className="admin-message-no-email">Không để lại email</span>}
+                        </div>
+                        <time dateTime={message.createdAt}><Clock size={14} />{formatDate(message.createdAt)}</time>
                       </div>
-                    )}
-                    <div className="admin-message-content">
-                      {message.message}
+                      <p className="admin-message-content">{message.message}</p>
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
             ) : (
               <div className="empty-state">
                 <ChatCircle size={34} />
-                <h3>Chưa có tin nhắn nào.</h3>
-                <p>Khi khách truy cập để lại tin nhắn qua Sổ lưu bút, tin nhắn sẽ xuất hiện ở đây.</p>
+                <h3>{messages.length ? 'Không tìm thấy tin nhắn phù hợp.' : 'Chưa có tin nhắn nào.'}</h3>
+                <p>{messages.length ? 'Thử lại với tên, email hoặc từ khóa khác.' : 'Khi khách truy cập để lại tin nhắn qua Sổ lưu bút, tin nhắn sẽ xuất hiện ở đây.'}</p>
               </div>
             )}
+            </section>
           </div>
         )}
       </div>
