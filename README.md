@@ -1,6 +1,6 @@
-# MELODIK
+# Ứng dụng nghe nhạc - Đồ án thực tập
 
-Ứng dụng nghe nhạc độc lập, lấy cảm hứng từ video tham chiếu trong thư mục dự án. Giao diện tiếng Việt, màu kem/hồng/tím, máy phát nhạc vinyl và thư viện ảnh kiểu scrapbook.
+Ứng dụng nghe nhạc được phát triển作为実習项目，参考了参考视频中的概念。界面使用越南语，采用奶油色/粉色/紫色配方，具有黑胶唱片播放器和剪贴簿风格的图片库。
 
 ## Chạy dự án
 
