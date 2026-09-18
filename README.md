@@ -1,100 +1,66 @@
-# Ứng dụng nghe nhạc - Đồ án thực tập
+# MIUZIG
 
-Ứng dụng nghe nhạc được phát triển作为実習项目，参考了参考视频中的概念。界面使用越南语，采用奶油色/粉色/紫色配方，具有黑胶唱片播放器和剪贴簿风格的图片库。
+MIUZIG là website nghe nhạc và không gian cộng đồng nhỏ, xây dựng bằng React, Express và PostgreSQL. Người dùng có thể tạo tài khoản, kết bạn, trò chuyện và chia sẻ nhạc hoặc ảnh; quản trị viên quản lý nội dung và thành viên từ trang `/admin`.
 
-## Chạy dự án
+## Công nghệ
 
-Yêu cầu Node.js **22.13 trở lên** (dùng SQLite tích hợp).
+- Frontend: React 19 + Vite
+- API local: Express 5
+- Dữ liệu local: SQLite (Node.js 22)
+- Production: Vercel Function + Neon PostgreSQL + Vercel Blob
+
+## Chạy local
+
+Yêu cầu Node.js 22.13 trở lên.
 
 ```sh
 npm --prefix app install
 npm run dev
 ```
 
-- Website: http://localhost:3000
-- Quản trị: http://localhost:3000/admin
-- API: http://127.0.0.1:4000/api/health
+- Website: `http://localhost:3000`
+- Admin: `http://localhost:3000/admin`
+- Health check: `http://127.0.0.1:4000/api/health`
 
-Ở local/demo có sẵn hai tài khoản để kiểm tra: `admin@gmail.com` / `admin123` cho quản trị và `user@gmail.com` / `user123` cho thành viên. Chúng chỉ được tạo trong SQLite local, không được tạo khi triển khai Vercel. Hãy đổi hoặc xoá chúng trước khi mở demo cho người khác. Tài khoản mới cần mật khẩu ít nhất 6 ký tự. Mật khẩu lưu dưới dạng scrypt hash, phiên đăng nhập dùng cookie HttpOnly.
+Local demo tự tạo hai tài khoản thử nghiệm:
+
+- Admin: `admin@gmail.com` / `admin123`
+- Thành viên: `user@gmail.com` / `user123`
+
+Các tài khoản này chỉ tồn tại trong SQLite local, không được tạo trên production. Mật khẩu production phải được tạo qua trang setup admin lần đầu hoặc đổi trong trang Hồ sơ admin.
 
 ## Chức năng
 
-- Phát/dừng, tua, chuyển bài, tự chuyển khi hết bài, ngẫu nhiên, lặp lại bài, âm lượng, tắt tiếng, phím Space.
-- Nhạc tiếp tục khi điều hướng nội bộ. Tải lại trang dừng nhạc để tôn trọng chính sách phát tự động của trình duyệt.
-- Playlist theo tâm trạng, tìm kiếm trong playlist, yêu thích trên thiết bị hiện tại.
-- Kỷ niệm: lọc theo nhóm, mở ảnh và câu chuyện chi tiết.
-- Sổ lưu bút: gửi lời nhắn riêng, quản trị viên xem và xóa. Không gửi email tự động.
-- Quản trị: thêm/sửa/xóa bài hát, playlist và kỷ niệm; tải âm thanh và ảnh bìa thật. Muốn xóa playlist cần chuyển hoặc xóa các bài bên trong trước.
-- Thành viên: đăng ký/đăng nhập, đăng bài nhạc và ảnh của mình, xem chúng ở Góc cộng đồng và scrapbook; tìm bạn bằng email, gửi/nhận lời mời và chat riêng sau khi hai bên chấp nhận kết bạn.
-- Các luồng có trạng thái tải, lỗi, trống, thành công và xác nhận xóa; dialog hỗ trợ bàn phím; bố cục responsive.
+- Nghe nhạc, chuyển bài, tua, điều chỉnh âm lượng, yêu thích và phát ngẫu nhiên/lặp lại.
+- Thư viện ảnh, playlist và nội dung do admin quản lý.
+- Thành viên đăng ký/đăng nhập, tạo hồ sơ, đăng bài nhạc/ảnh, kết bạn và trò chuyện riêng.
+- Góc nghe nhạc hiển thị nhạc cá nhân và nội dung bạn bè được chấp nhận.
+- Trang admin quản lý thành viên, tin nhắn sổ lưu bút, hồ sơ và nội dung.
+- Sổ lưu bút là form công khai: người gửi không bắt buộc có tài khoản và email nhập vào không được xác thực danh tính.
 
-Theo yêu cầu tinh giản, chưa làm newsletter, timeline, blog quảng bá hoặc tích hợp mạng xã hội.
+## Upload và dữ liệu
 
-## Nhạc và hình ảnh
+- Audio hỗ trợ: MP3, WAV, OGG, FLAC, M4A; tối đa 50 MB.
+- Ảnh hỗ trợ: JPG, PNG, WebP; tối đa 8 MB.
+- Local lưu dữ liệu tại `app/data/`.
+- Production lưu dữ liệu quan hệ trong Neon và file tải lên trong Vercel Blob.
 
-12 đoạn nhạc nghe thử dài 36–44 giây được tổng hợp bằng mã trong `app/server/seed.mjs`, không tải âm nhạc hay gọi YouTube/Spotify. Đây là đoạn mẫu kiểm thử, không phải thư viện bài hát hoàn chỉnh. Admin có thể xóa hoặc thay file bất kỳ.
+Không đưa `.env*`, `app/data/`, `.vercel/`, database hoặc token Blob vào Git.
 
-Âm thanh tải lên: MP3, WAV, OGG, FLAC, M4A, tối đa 50 MB/file; khả năng giải mã phụ thuộc codec/trình duyệt. Ảnh: JPG, PNG, WebP, tối đa 8 MB/file. Admin chỉ nên đăng nội dung có quyền sử dụng; tự tải file không tự động làm mất nghĩa vụ về bản quyền.
+## Deploy Vercel
 
-Để giao diện không vỡ, dữ liệu bài hát luôn có bìa mặc định, tiêu đề, nghệ sĩ, thời lượng được kiểm tra và player báo lỗi thay vì làm hỏng trang nếu trình duyệt không phát được file. Tuy vậy, ứng dụng hiện **không chuyển mã** audio/video: Vercel Function không phù hợp để chạy FFmpeg nặng và không nên cố chuyển đổi trong lúc người dùng chờ upload. Chuẩn phát hành nên là MP3 (audio/mpeg) hoặc M4A/AAC; những file lạ/không được hỗ trợ sẽ bị chặn hoặc báo lỗi rõ ràng.
+Trong Vercel, đặt **Root Directory** là `app` và tạo các biến môi trường sau:
 
-Khi cần hỗ trợ video hay tự động chuẩn hóa mọi file, bước tiếp theo là thêm hàng đợi media riêng: Blob nhận file gốc → worker FFmpeg/Cloudinary/Mux chuyển thành MP3/AAC hoặc HLS → database chỉ công bố URL bản đã xử lý. Hệ thống hiện đã tách Blob và database, nên có thể gắn worker này mà không đổi giao diện hay làm mất dữ liệu. Không tự ý tích hợp dịch vụ chuyển mã khi chưa có tài khoản, ngân sách và chính sách bản quyền của khách hàng.
-
-Ảnh minh họa và artwork được trích từ **video do người dùng cung cấp**, không tải từ thư viện ảnh bên ngoài. Nguồn và vùng trích nằm trong `tools/extract_assets.py`. Có thể thay bằng ảnh gốc của khách hàng từ trang quản trị trước khi phát hành. Logo là chữ hiển thị bằng font. Font Quicksand/Nunito và icon Phosphor được đóng gói cục bộ, không cần kết nối dịch vụ font bên ngoài.
-
-## Kiến trúc production trên Vercel
-
-Khi triển khai, ứng dụng tự chuyển sang kiến trúc phù hợp với serverless:
-
-| Phần | Local demo | Vercel production / preview |
-| --- | --- | --- |
-| Giao diện | Vite + Express | Vite static (`dist/client`) |
-| API | Express tại `127.0.0.1:4000` | Vercel Function `app/api/index.mjs` |
-| Dữ liệu nghiệp vụ | SQLite trong `app/data/` | PostgreSQL serverless (khuyến nghị Neon) |
-| Nhạc, ảnh do admin tải | `app/data/uploads/` | Vercel Blob, tải thẳng từ trình duyệt |
-
-Nhạc và ảnh **không đi qua Function** ở môi trường Vercel. Token tải chỉ được phát hành sau khi admin đã đăng nhập; Blob giới hạn đúng loại MIME, kích cỡ, đường dẫn ngẫu nhiên; server kiểm tra lại metadata Blob trước khi ghi URL vào database. Điều này vừa tránh giới hạn kích cỡ request của serverless vừa không phụ thuộc ổ đĩa tạm của Vercel.
-
-### Chuẩn bị một lần
-
-1. Đẩy source code lên GitHub/GitLab/Bitbucket và tạo một Project Vercel với **Root Directory: `app`**.
-2. Tạo một Neon PostgreSQL database, hoặc một branch/database riêng cho từng môi trường `Production` và `Preview`. Đặt `DATABASE_URL` tương ứng tại Vercel Project Settings.
-3. Trong Vercel, tạo và kết nối một Blob store với project. Vercel sẽ cấp quyền truy cập Blob; nếu tổ chức của bạn không dùng OIDC, thêm `BLOB_READ_WRITE_TOKEN` do Vercel Blob cung cấp.
-4. Tạo một chuỗi ngẫu nhiên dài cho `ADMIN_BOOTSTRAP_TOKEN`, và đặt `APP_ORIGIN` bằng URL production thực tế, ví dụ `https://music.example.com`. Preview tự nhận URL preview do Vercel cấp; vẫn nên dùng database/Blob riêng để không thử nghiệm trên dữ liệu thật. Không đưa các giá trị này vào Git.
-5. Từ máy có `DATABASE_URL` của đúng môi trường, chạy migration một lần trước khi mở website:
-
-```sh
-npm --prefix app install
-npm run migrate
+```text
+DATABASE_URL=postgresql://...
+APP_ORIGIN=https://your-domain.example
+ADMIN_BOOTSTRAP_TOKEN=<one-time-random-token>
+BLOB_READ_WRITE_TOKEN=<when OIDC Blob is unavailable>
 ```
 
-6. Deploy. Lần đầu vào `/admin`, nhập email, mật khẩu và **mã thiết lập** (`ADMIN_BOOTSTRAP_TOKEN`). Sau khi có admin, mã đó không còn tạo thêm tài khoản được; nên đổi hoặc xoá biến này sau khi thiết lập xong.
+Kết nối một Vercel Blob store với project. Mỗi lần build trên Vercel sẽ chạy migration trước rồi mới build frontend (`npm run migrate && npm run build`), vì vậy schema PostgreSQL được cập nhật cùng lần deploy.
 
-Vercel tự build bằng `npm run build`; `app/vercel.json` đưa các route `/api/*` về Function và các route giao diện về ứng dụng React. Không cần chạy `npm start` trên Vercel. Chưa có dữ liệu cloud nào được tạo hay deploy trong repository này — các bước trên yêu cầu tài khoản Vercel/Neon của bạn.
-
-### Dữ liệu, backup và chuyển dữ liệu
-
-- Source không bao giờ chứa database, nhạc, ảnh hay bí mật. `.env*`, `app/data/` và `.vercel/` đều đã được bỏ qua trong Git; xem mẫu biến ở [`app/.env.example`](app/.env.example).
-- Lưu backup PostgreSQL định kỳ (Neon có lịch sử/backup theo gói) và dùng khả năng liệt kê/export của Blob để sao lưu file. Một bản backup chỉ database sẽ không phục hồi file nhạc/ảnh.
-- Bản local hiện hữu vẫn giữ nguyên tại `app/data/`; trước khi xuất bản thật, hãy chép các audio/ảnh có quyền sử dụng sang Blob và tạo lại/sửa các mục từ admin. Cách này tránh tự động đẩy nội dung chưa kiểm tra bản quyền lên cloud.
-- Xoá nội dung chỉ gỡ bản ghi khỏi thư viện. Blob/file gốc được giữ để tránh mất dữ liệu ngoài ý muốn; hãy dọn các file mồ côi sau khi đã có backup.
-
-### Vận hành local
-
-- Frontend: React + Vite; backend: Express; dữ liệu: SQLite.
-- Dữ liệu bền vững local nằm ở `app/data/melodik.sqlite`; file ở `app/data/uploads/`. Sao lưu toàn bộ `app/data/` khi server đã dừng.
-- Đổi thư mục dữ liệu local bằng biến `DATA_DIR` (đường dẫn tuyệt đối). API mặc định nghe tại `127.0.0.1:4000`; `PORT` và `HOST` có thể cấu hình.
-
-Chạy bản build:
-
-```sh
-npm run build
-npm start
-```
-
-Sau đó mở http://127.0.0.1:4000. Express phục vụ cả frontend, API và file nhạc có hỗ trợ HTTP Range để tua bài.
-
-Các tệp Worker/Sites đi kèm starter chỉ dành cho prototype frontend; production của dự án này dùng Vercel Function + PostgreSQL + Blob như trên. Dự án chưa được đưa lên Internet.
+Lần đầu truy cập `/admin`, tạo tài khoản quản trị bằng email, mật khẩu và `ADMIN_BOOTSTRAP_TOKEN`. Sau khi setup xong, hãy đổi hoặc xoá token bootstrap khỏi Vercel Environment Variables.
 
 ## Kiểm tra
 
@@ -103,6 +69,13 @@ npm test
 npm run build
 ```
 
-Kiểm thử API dùng database riêng trong thư mục tạm: quyền truy cập, setup/login/logout, xác minh loại file, upload, stream Range, sửa/xóa nội dung, lời nhắn riêng và dữ liệu sau khi mở lại database. Không tạo tài khoản hay ghi dữ liệu kiểm thử vào thư viện đang chạy.
+Test API dùng database tạm riêng và không ghi vào dữ liệu local hay production.
 
-Mã ứng dụng ở `app/src/`, máy chủ ở `app/server/`; `reference/` chứa các khung hình phục vụ đối chiếu và không được đưa vào website.
+## Cấu trúc chính
+
+```text
+app/src/       # React UI
+app/server/    # Express, database, migration và seed local
+app/api/       # Vercel Function entry point
+app/tests/     # API tests
+```
