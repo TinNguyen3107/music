@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ArrowUpRight, ArrowDown, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, EnvelopeSimple, MagnifyingGlass, NotePencil, SignOut, Sparkle, UserCircle, UsersThree } from '@phosphor-icons/react';
+import { ArrowRight, ArrowUpRight, ArrowDown, ArrowsClockwise, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, EnvelopeSimple, MagnifyingGlass, NotePencil, SignOut, Sparkle, UserCircle, UsersThree } from '@phosphor-icons/react';
 import { upload as uploadToBlob } from '@vercel/blob/client';
 import { api, Modal } from './shared.jsx';
 
@@ -724,7 +724,7 @@ export function Admin({
                   <p>Phản hồi công khai do khách truy cập gửi qua trang Sổ lưu bút.</p>
                 </div>
                 <button className="button secondary" onClick={loadMessages} disabled={loadingMessages}>
-                  {loadingMessages ? <CircleNotch className="spin" size={17} /> : <ArrowDown size={17} />}
+                  {loadingMessages ? <CircleNotch className="spin" size={17} /> : <ArrowsClockwise size={17} />}
                   {loadingMessages ? 'Đang tải' : 'Làm mới'}
                 </button>
               </div>
