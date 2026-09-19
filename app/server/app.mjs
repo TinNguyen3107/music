@@ -232,21 +232,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
       FROM community_photos
       GROUP BY userId
     ) pc ON u.id = pc.userId
-    LEFT JOIN (
-      SELECT
-        CASE
-          WHEN userId < friendId THEN userId
-          ELSE friendId
-        END AS userId,
-        COUNT(*) AS count
-      FROM friendships
-      WHERE status = 'accepted'
-      GROUP BY
-        CASE
-          WHEN userId < friendId THEN userId
-          ELSE friendId
-        END
-    ) fc ON u.id = fc.userId
+    LEFT JOIN ( SELECT user_id AS userId, COUNT(*) AS count FROM ( SELECT userId AS user_id FROM friendships WHERE status = 'accepted' UNION ALL SELECT friendId AS user_id FROM friendships WHERE status = 'accepted' ) sub GROUP BY user_id ) fc ON u.id = fc.userId
     ORDER BY u.createdAt DESC
   `);
   res.json(results);
@@ -462,3 +448,4 @@ app.delete('/api/chat/:messageId', authUser, async (req, res) => {
   app.use((error, _req, res, _next) => { const status = error instanceof multer.MulterError ? 400 : error.status || 500; if (status === 500) console.error(error); res.status(status).json({ error: error instanceof multer.MulterError ? 'File quá lớn hoặc số lượng file không hợp lệ (âm thanh tối đa 50 MB).' : status === 500 ? 'Có lỗi khi lưu dữ liệu. Vui lòng thử lại.' : error.message }); });
   return { app, db, production };
 }
+
