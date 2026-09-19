@@ -114,3 +114,6 @@
 .admin-modal-grid-content .admin-modal-item-info { font-size: 0.85rem !important; line-height: 1.4 !important; min-width: 0 !important; }
 .admin-modal-grid-content .admin-modal-item-info strong { display: block !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; color: #1a3c40 !important; }
 .admin-modal-grid-content img { width: 100% !important; height: auto !important; aspect-ratio: 1 / 1 !important; object-fit: cover !important; border-radius: 8px !important; display: block !important; }
+
+.record-player .icon-button.active { color: var(--pink) !important; background: var(--rose) !important; }
+
