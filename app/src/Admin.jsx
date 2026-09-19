@@ -316,7 +316,6 @@ export function Admin({
         <span className="eyebrow"><LockKey size={15} /> MIUZIG STUDIO</span>
         <h1>Quản lý<br /><span>người dùng.</span></h1>
         <p>Trang này chỉ dành cho quản trị viên để xem tài khoản thành viên, thời gian tạo tài khoản và trạng thái hoạt động.</p>
-        <img src="/artwork/desk.webp" alt="Góc quản trị MIUZIG" />
       </div>
       <form className="auth-form" onSubmit={signIn}>
         <span className="genre-label">QUẢN TRỊ VIÊN</span>

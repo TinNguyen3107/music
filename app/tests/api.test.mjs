@@ -58,9 +58,9 @@ test('authenticated content lifecycle, uploads, range playback and persistence',
   assert.equal((await call(`/api/admin/tracks/${uploaded.id}`, 'PUT', edit)).status, 200);
   assert.equal((await call(`/api/admin/playlists/${playlistId}`, 'DELETE')).status, 409);
   const photo = new FormData(); for (const [k, v] of Object.entries({ title: 'Test photo', category: 'Đời thường', location: 'Studio', caption: 'A test memory', date: '2026-09-10' })) photo.set(k, v);
-  photo.set('image', new Blob([readFileSync(new URL('../public/artwork/coffee.webp', import.meta.url))], { type: 'image/webp' }), 'coffee.webp');
+  photo.set('image', new Blob([readFileSync(new URL('../public/artwork/avatar_cat_1.jpg', import.meta.url))], { type: 'image/webp' }), 'avatar_cat_1.jpg');
   const createdPhoto = await call('/api/admin/photos', 'POST', photo); assert.equal(createdPhoto.status, 201);
-  const interfaceImage = new FormData(); interfaceImage.set('image', new Blob([readFileSync(new URL('../public/artwork/tea.webp', import.meta.url))], { type: 'image/webp' }), 'tea.webp');
+  const interfaceImage = new FormData(); interfaceImage.set('image', new Blob([readFileSync(new URL('../public/artwork/avatar_cat_4.jpg', import.meta.url))], { type: 'image/webp' }), 'avatar_cat_4.jpg');
   assert.equal((await call('/api/admin/settings/communityImage', 'POST', interfaceImage)).status, 200);
   assert.match((await call('/api/catalog')).data.settings.communityImage, /^\/media\//);
   const firstUser = await call('/api/users/register', 'POST', { name: 'Listener One', publicId: '#1001', email: 'listener1@example.test', password: 'Listener-one-passphrase-2026' });
@@ -69,9 +69,9 @@ test('authenticated content lifecycle, uploads, range playback and persistence',
   communityTrack.set('audio', new Blob([wav], { type: 'audio/wav' }), 'community.wav');
   assert.equal((await callAs(userCookie, '/api/users/tracks', 'POST', communityTrack)).status, 201);
   const communityPhoto = new FormData(); for (const [k, v] of Object.entries({ title: 'Community photo', category: 'Life', location: 'Home', caption: 'A shared moment', date: '2026-09-11', visibility: 'friends' })) communityPhoto.set(k, v);
-  communityPhoto.set('image', new Blob([readFileSync(new URL('../public/artwork/tea.webp', import.meta.url))], { type: 'image/webp' }), 'tea.webp');
+  communityPhoto.set('image', new Blob([readFileSync(new URL('../public/artwork/avatar_cat_4.jpg', import.meta.url))], { type: 'image/webp' }), 'avatar_cat_4.jpg');
   assert.equal((await callAs(userCookie, '/api/users/photos', 'POST', communityPhoto)).status, 201);
-  const communityInterfaceImage = new FormData(); communityInterfaceImage.set('image', new Blob([readFileSync(new URL('../public/artwork/flowers.webp', import.meta.url))], { type: 'image/webp' }), 'flowers.webp');
+  const communityInterfaceImage = new FormData(); communityInterfaceImage.set('image', new Blob([readFileSync(new URL('../public/artwork/avatar_cat_4.jpg', import.meta.url))], { type: 'image/webp' }), 'avatar_cat_4.jpg');
   assert.equal((await callAs(userCookie, '/api/users/settings/guestbookImage', 'POST', communityInterfaceImage)).status, 200);
   assert.match((await callAs(userCookie, '/api/users/settings')).data.settings.guestbookImage, /^\/media\//);
   assert.deepEqual((await call('/api/users/settings')).data.settings, {});

@@ -182,7 +182,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     if (await row('SELECT id FROM users WHERE email=?', [mail])) throw fail('Email này đã có tài khoản.', 409);
     if (await row('SELECT id FROM users WHERE publicId=?', [userPublicId])) throw fail('ID này đã có người dùng. Hãy chọn 4 số khác.', 409);
     const userId = makeId(), salt = randomBytes(16).toString('hex');
-    const defaultAvatars = ['/artwork/coffee.webp', '/artwork/desk.webp', '/artwork/evening.webp', '/artwork/flowers.webp', '/artwork/forest.webp', '/artwork/night.webp', '/artwork/reading.webp', '/artwork/record.webp', '/artwork/sleeve.webp', '/artwork/tea.webp'];
+    const defaultAvatars = ['/artwork/avatar_cat_1.jpg', '/artwork/avatar_cat_2.jpg', '/artwork/avatar_cat_3.jpg', '/artwork/avatar_cat_4.jpg'];
     const randomAvatar = defaultAvatars[Math.floor(Math.random() * defaultAvatars.length)];
     const avatar = await media(req, 'avatar', 'image', randomAvatar);
     const now = new Date().toISOString();
@@ -445,7 +445,7 @@ app.delete('/api/chat/:messageId', authUser, async (req, res) => {
     const previous = req.params.id ? await row('SELECT * FROM playlists WHERE id=?', [req.params.id]) : null;
     if (req.params.id && !previous) throw fail('Không tìm thấy playlist.', 404);
     const name = text(req.body.name, 80), description = text(req.body.description, 500, false), label = text(req.body.label || 'MỘT PLAYLIST NHỎ', 80);
-    const cover = await media(req, 'cover', 'cover', previous?.cover || '/artwork/tea.webp'), playlistId = previous?.id || makeId();
+    const cover = await media(req, 'cover', 'cover', previous?.cover || '/artwork/avatar_cat_4.jpg'), playlistId = previous?.id || makeId();
     await query('INSERT INTO playlists (id,name,description,cover,label,position,createdAt) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,cover=excluded.cover,label=excluded.label', [playlistId, name, description, cover, label, previous?.position ?? 100, previous?.createdAt || new Date().toISOString()]);
     res.status(previous ? 200 : 201).json({ id: playlistId });
   }
