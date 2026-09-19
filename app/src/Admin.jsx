@@ -355,7 +355,7 @@ export function Admin({
           </div>
         ) : (
           modalData.length ? (
-            <div className="admin-modal-content">
+            <div className="admin-modal-grid-content">
               {modalType === 'tracks' ? (
                 modalData.map(track => (
                   <div key={track.id} className="admin-modal-item">

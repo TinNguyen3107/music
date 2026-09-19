@@ -128,7 +128,7 @@ function setBodyField(body, key, value) {
 
 function SuggestionChips({ items, onPick }) {
   if (!items.length) return null;
-  return <div className="suggestion-chips">{items.slice(0, 8).map(item => <button type="button" key={item} onClick={() => onPick(item)}>{item}</button>)}</div>;
+  return <div className="suggestion-dropdown-list">{items.slice(0, 8).map(item => <button type="button" key={item} onClick={() => onPick(item)}>{item}</button>)}</div>;
 }
 
 function ProfileCard({ user, activity, isSelf, onImage }) {
