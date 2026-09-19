@@ -182,7 +182,9 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     if (await row('SELECT id FROM users WHERE email=?', [mail])) throw fail('Email này đã có tài khoản.', 409);
     if (await row('SELECT id FROM users WHERE publicId=?', [userPublicId])) throw fail('ID này đã có người dùng. Hãy chọn 4 số khác.', 409);
     const userId = makeId(), salt = randomBytes(16).toString('hex');
-    const avatar = await media(req, 'avatar', 'image', '/artwork/sleeve.webp');
+    const defaultAvatars = ['/artwork/coffee.webp', '/artwork/desk.webp', '/artwork/evening.webp', '/artwork/flowers.webp', '/artwork/forest.webp', '/artwork/night.webp', '/artwork/reading.webp', '/artwork/record.webp', '/artwork/sleeve.webp', '/artwork/tea.webp'];
+    const randomAvatar = defaultAvatars[Math.floor(Math.random() * defaultAvatars.length)];
+    const avatar = await media(req, 'avatar', 'image', randomAvatar);
     const now = new Date().toISOString();
     await query('INSERT INTO users (id,name,email,publicId,avatar,bio,passwordHash,salt,lastActiveAt,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?)', [userId, name, mail, userPublicId, avatar, bio, scryptSync(password, salt, 64).toString('hex'), salt, now, now]);
     await createUserSession(res, userId); res.status(201).json({ user: { id: userId, name, email: mail, publicId: userPublicId, avatar, bio } });
