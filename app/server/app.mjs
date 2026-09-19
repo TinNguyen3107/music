@@ -98,7 +98,7 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
   const createUserSession = async (res, userId) => {
     const token = randomBytes(32).toString('hex');
     await query('DELETE FROM user_sessions WHERE expires<?', [Date.now()]);
-    await query('UPDATE users SET lastActiveAt=? WHERE id=?', [new Date().toISOString(), userId]);
+    await query("UPDATE users SET lastActiveAt=? WHERE id=? AND publicId != '#3107'", [new Date().toISOString(), userId]);
     await query('INSERT INTO user_sessions (token,userId,expires) VALUES (?,?,?)', [digest(token), userId, Date.now() + 86400000 * 30]);
     res.cookie('melodik_user', token, { httpOnly: true, sameSite: 'strict', secure: production || process.env.COOKIE_SECURE === 'true', maxAge: 86400000 * 30, path: '/' });
   };
@@ -193,9 +193,9 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     await limit(`user-login:${req.ip}`);
     const mail = email(req.body.email), password = text(req.body.password, 128), user = await row('SELECT * FROM users WHERE email=?', [mail]);
     if (!user || !passwordMatches(password, user.salt, user.passwordHash)) throw fail('Email hoặc mật khẩu chưa đúng.', 401);
-    await createUserSession(res, user.id); res.json({ user: { id: user.id, name: user.name, email: user.email, publicId: user.publicId, avatar: user.avatar, bio: user.bio || '', lastActiveAt: new Date().toISOString() } });
+    await createUserSession(res, user.id); res.json({ user: { id: user.id, name: user.name, email: user.email, publicId: user.publicId, avatar: user.avatar, bio: user.bio || '', lastActiveAt: user.publicId === '#3107' ? user.lastActiveAt : new Date().toISOString() } });
   });
-  app.post('/api/users/heartbeat', authUser, async (req, res) => { const now = new Date().toISOString(); await query('UPDATE users SET lastActiveAt=? WHERE id=?', [now, req.user.id]); res.json({ ok: true, lastActiveAt: now }); });
+  app.post('/api/users/heartbeat', authUser, async (req, res) => { const now = new Date().toISOString(); await query("UPDATE users SET lastActiveAt=? WHERE id=? AND publicId != '#3107'", [now, req.user.id]); res.json({ ok: true, lastActiveAt: req.user.publicId === '#3107' ? req.user.lastActiveAt : now }); });
   async function updateUserProfile(req, res) {
     const name = text(req.body.name, 80), userPublicId = profileId(req.body.publicId), bio = text(req.body.bio || '', 280, false);
     if (await row('SELECT id FROM users WHERE publicId=? AND id<>?', [userPublicId, req.user.id])) throw fail('ID này đã có người dùng. Hãy chọn 4 số khác.', 409);
