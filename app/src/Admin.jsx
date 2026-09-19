@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ArrowUpRight, ArrowDown, ArrowsClockwise, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, EnvelopeSimple, MagnifyingGlass, NotePencil, SignOut, Sparkle, UserCircle, UsersThree } from '@phosphor-icons/react';
+import { ArrowRight, ArrowUpRight, ArrowDown, ArrowsClockwise, CalendarBlank, CircleNotch, Clock, Eye, EyeSlash, LockKey, ChatCircle, EnvelopeSimple, MagnifyingGlass, NotePencil, SignOut, Sparkle, Trash, UserCircle, UsersThree } from '@phosphor-icons/react';
 import { upload as uploadToBlob } from '@vercel/blob/client';
 import { api, Modal } from './shared.jsx';
 
@@ -341,7 +341,7 @@ export function Admin({
 
     return (
       <Modal
-        title={modalType === 'tracks' ? 'Bài hát của ' + modalUser.name : 'Kỷ niệm của ' + modalUser.name}
+        title={modalType === 'tracks' ? 'Bài hát của ' + modalUser.name : modalType === 'photos' ? 'Kỷ niệm của ' + modalUser.name : 'Bạn bè của ' + modalUser.name}
         onClose={() => {
           setModalType(null);
           setModalUser(null);
@@ -373,7 +373,7 @@ export function Admin({
                     )}
                   </div>
                 ))
-              ) : (
+              ) : modalType === 'photos' ? (
                 modalData.map(photo => (
                   <div key={photo.id} className="admin-modal-item">
                     <div className="admin-modal-item-info">
@@ -387,6 +387,22 @@ export function Admin({
                       src={photo.image}
                       alt={photo.title}
                       className="admin-modal-item-image"
+                    />
+                  </div>
+                ))
+              ) : (
+                modalData.map(friend => (
+                  <div key={friend.id} className="admin-modal-item" style={{ alignItems: 'center' }}>
+                    <div className="admin-modal-item-info">
+                      <strong>{friend.name}</strong> <small>{friend.publicId || '#0000'}</small>
+                      <br />
+                      <small>Email: {friend.email}</small>
+                    </div>
+                    <img
+                      src={friend.avatar || '/artwork/sleeve.webp'}
+                      alt={friend.name}
+                      className="admin-modal-item-cover"
+                      style={{ borderRadius: '50%' }}
                     />
                   </div>
                 ))
@@ -638,6 +654,7 @@ export function Admin({
                         <th>Bài hát</th>
                         <th>Kỷ niệm</th>
                         <th>Bạn bè</th>
+                        <th aria-label="Thao tác"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -663,6 +680,7 @@ export function Admin({
                             </td>
                             <td>{user.publicId || '#0000'}</td>
                             <td
+                              style={{ cursor: 'pointer', textDecoration: 'underline' }}
                               onClick={() => {
                                 setModalType('tracks');
                                 setModalUser(user);
@@ -681,6 +699,7 @@ export function Admin({
                               {Number(user.trackcount || user.trackCount || 0)}
                             </td>
                             <td
+                              style={{ cursor: 'pointer', textDecoration: 'underline' }}
                               onClick={() => {
                                 setModalType('photos');
                                 setModalUser(user);
@@ -698,7 +717,43 @@ export function Admin({
                             >
                               {Number(user.photocount || user.photoCount || 0)}
                             </td>
-                            <td>{Number(user.friendcount || user.friendCount || 0)}</td>
+                            <td
+                              style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                              onClick={() => {
+                                setModalType('friends');
+                                setModalUser(user);
+                                setModalLoading(true);
+                                api(`/api/admin/users/${user.id}/friends`)
+                                  .then(data => {
+                                    setModalData(data);
+                                    setModalLoading(false);
+                                  })
+                                  .catch(err => {
+                                    notify?.(err.message);
+                                    setModalLoading(false);
+                                  })
+                              }}
+                            >
+                              {Number(user.friendcount || user.friendCount || 0)}
+                            </td>
+                            <td>
+                              <button
+                                className="icon-button"
+                                aria-label="Xóa người dùng"
+                                onClick={async () => {
+                                  if (!window.confirm('Bạn có chắc muốn xóa người dùng này cùng tất cả dữ liệu (bài hát, kỷ niệm, bạn bè)? Hành động này không thể hoàn tác.')) return;
+                                  try {
+                                    await api(`/api/admin/users/${user.id}`, { method: 'DELETE' });
+                                    notify?.('Đã xóa người dùng ' + user.name);
+                                    loadUsers();
+                                  } catch (error) {
+                                    notify?.(error.message);
+                                  }
+                                }}
+                              >
+                                <Trash size={18} color="var(--error-fg, red)" />
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}

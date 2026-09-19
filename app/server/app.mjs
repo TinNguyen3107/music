@@ -256,6 +256,31 @@ export async function createApp({ dataDir = process.env.DATA_DIR || path.join(ap
     const photos = await all('SELECT community_photos.*,users.name AS owner,users.publicId AS ownerPublicId,users.avatar AS ownerAvatar FROM community_photos JOIN users ON users.id=community_photos.userId WHERE community_photos.userId=? ORDER BY community_photos.date DESC', [id]);
     res.json(photos);
   });
+  app.get('/api/admin/users/:id/friends', auth, async (req, res) => {
+    const { id } = req.params;
+    const userExists = await row('SELECT id FROM users WHERE id=?', [id]);
+    if (!userExists) return res.status(404).json({ error: 'User not found' });
+    const friends = await all(`
+      SELECT u.id, u.name, u.email, u.publicId, u.avatar, f.createdAt
+      FROM friendships f
+      JOIN users u ON (u.id = f.friendId AND f.userId = ?) OR (u.id = f.userId AND f.friendId = ?)
+      WHERE f.status = 'accepted'
+      ORDER BY f.createdAt DESC
+    `, [id, id]);
+    res.json(friends);
+  });
+  app.delete('/api/admin/users/:id', auth, async (req, res) => {
+    const { id } = req.params;
+    await query('DELETE FROM user_sessions WHERE userId=?', [id]);
+    await query('DELETE FROM user_settings WHERE userId=?', [id]);
+    await query('DELETE FROM chat_reads WHERE userId=? OR friendId=?', [id, id]);
+    await query('DELETE FROM chat_messages WHERE senderId=? OR recipientId=?', [id, id]);
+    await query('DELETE FROM friendships WHERE userId=? OR friendId=?', [id, id]);
+    await query('DELETE FROM community_tracks WHERE userId=?', [id]);
+    await query('DELETE FROM community_photos WHERE userId=?', [id]);
+    await query('DELETE FROM users WHERE id=?', [id]);
+    res.json({ ok: true });
+  });
   app.get('/api/admin/messages', auth, async (_req, res) => res.json(await all('SELECT * FROM messages ORDER BY createdAt DESC')));
 app.post('/api/auth/password', auth, async (req, res) => {
   // Ensure the logged-in user is an admin
