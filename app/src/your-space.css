@@ -154,7 +154,7 @@
   .space-layout.mobile-chat-open .chat-log.expanded{touch-action:pan-y}
   .space-layout.mobile-chat-open .chat-message-row .message-bubble{max-width:min(88%,520px)}
 }
-.suggestion-dropdown-list { display: flex; flex-direction: column; margin: 4px 0 16px; border: 1px solid #cbe5e1; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 4px 12px rgba(23,75,79,0.1); width: 100%; z-index: 10; }
+.suggestion-dropdown-list { display: flex; flex-direction: column; margin: 4px 0 16px; border: 1px solid #cbe5e1; border-radius: 8px; overflow-y: auto; background: #fff; box-shadow: 0 4px 12px rgba(23,75,79,0.1); width: 100%; z-index: 10; position: absolute; top: 100%; left: 0; max-height: 200px; }
 .suggestion-dropdown-list button { padding: 10px 14px; border: none !important; border-bottom: 1px solid #f0f7f6 !important; border-radius: 0 !important; background: transparent !important; color: #1a3c40 !important; font-size: 0.85rem !important; font-weight: 500 !important; text-align: left; cursor: pointer; transition: background 0.15s ease; width: 100%; display: block; box-shadow: none !important; transform: none !important; }
 .suggestion-dropdown-list button:last-child { border-bottom: none !important; }
 .suggestion-dropdown-list button:hover { background: #e8f7f5 !important; color: #087168 !important; }
